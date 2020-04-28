@@ -7,7 +7,7 @@ import (
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
-	"github.com/poopoothegorilla/pandas/series"
+	"github.com/poopoothegorilla/fastframe/series"
 	"gonum.org/v1/gonum/mat"
 )
 

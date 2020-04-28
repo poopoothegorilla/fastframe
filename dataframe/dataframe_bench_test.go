@@ -8,8 +8,8 @@ import (
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/memory"
-	"github.com/poopoothegorilla/pandas/dataframe"
-	"github.com/poopoothegorilla/pandas/series"
+	"github.com/poopoothegorilla/fastframe/dataframe"
+	"github.com/poopoothegorilla/fastframe/series"
 )
 
 func BenchmarkAdd(b *testing.B) {

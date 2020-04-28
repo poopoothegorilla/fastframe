@@ -8,7 +8,7 @@ import (
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/memory"
 	gotaseries "github.com/go-gota/gota/series"
-	"github.com/poopoothegorilla/pandas/series"
+	"github.com/poopoothegorilla/fastframe/series"
 	"github.com/ptiger10/tada"
 )
 
