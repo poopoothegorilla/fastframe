@@ -18,7 +18,7 @@ type DataFrame struct {
 }
 
 // NewFromRecords ...
-func NewFromRecords(records []array.Record, pool memory.Allocator) DataFrame {
+func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 	for _, record := range records {
 		record.Retain()
 		defer record.Release()
@@ -278,7 +278,7 @@ func (df DataFrame) ApplyToRecords(fn func(array.Record) array.Record) DataFrame
 		i++
 	}
 
-	return NewFromRecords(records, df.pool)
+	return NewFromRecords(df.pool, records)
 }
 
 // Head ...
@@ -374,7 +374,7 @@ func (df DataFrame) AppendRecords(records []array.Record) DataFrame {
 
 	allRecords = append(allRecords, records...)
 
-	return NewFromRecords(allRecords, df.pool)
+	return NewFromRecords(df.pool, allRecords)
 }
 
 // AppendSeries ...

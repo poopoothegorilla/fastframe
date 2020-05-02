@@ -101,7 +101,7 @@ func TestNewFromRecords(t *testing.T) {
 				defer inRecords[i].Release()
 			}
 
-			act := dataframe.NewFromRecords(inRecords, pool)
+			act := dataframe.NewFromRecords(pool, inRecords)
 			defer act.Release()
 
 			numR, numC := act.Dims()
