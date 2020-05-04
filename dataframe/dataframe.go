@@ -18,6 +18,8 @@ type DataFrame struct {
 }
 
 // NewFromRecords ...
+// TODO(poopoothegorilla): optimizations are needed here
+// TODO(poopoothegorilla): nulls are needed
 func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 	for _, record := range records {
 		record.Retain()
@@ -47,6 +49,8 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					newVals = c.Interface.(*array.Int32).Int32Values()
 				}
 				vals = append(vals, newVals...)
+				// TODO(poopoothegorilla): this keeps creating and overwriting old
+				// series. There should be some easier ways to optimize this.
 				s := series.FromInt32(pool, field, vals, nil)
 				ss[i] = s
 			}
@@ -64,6 +68,8 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					newVals = c.Interface.(*array.Int64).Int64Values()
 				}
 				vals = append(vals, newVals...)
+				// TODO(poopoothegorilla): this keeps creating and overwriting old
+				// series. There should be some easier ways to optimize this.
 				s := series.FromInt64(pool, field, vals, nil)
 				ss[i] = s
 			}
@@ -81,6 +87,8 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					newVals = c.Interface.(*array.Float32).Float32Values()
 				}
 				vals = append(vals, newVals...)
+				// TODO(poopoothegorilla): this keeps creating and overwriting old
+				// series. There should be some easier ways to optimize this.
 				s := series.FromFloat32(pool, field, vals, nil)
 				ss[i] = s
 			}
@@ -98,6 +106,8 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					newVals = c.Interface.(*array.Float64).Float64Values()
 				}
 				vals = append(vals, newVals...)
+				// TODO(poopoothegorilla): this keeps creating and overwriting old
+				// series. There should be some easier ways to optimize this.
 				s := series.FromFloat64(pool, field, vals, nil)
 				ss[i] = s
 			}
@@ -538,10 +548,91 @@ func (df DataFrame) DropNARowsBySeriesIndices(seriesIndices []int) DataFrame {
 // }
 
 // LeftJoin ...
-// func LeftJoin(dfl DataFrame, nl string, dfr DataFrame, nr string) DataFrame {
-// 	vl := dfl.SeriesByName(nl).Values()
-// 	dfr.SeriesByName(nr).FindIndices(vl)
-// }
+func LeftJoin(leftDF DataFrame, leftName string, rightDF DataFrame, rightName string) DataFrame {
+	// TODO(poopoothegorilla): add check for series name overlaps
+	fields := make([]arrow.Field, len(leftDF.series)+len(rightDF.series)-1)
+	fieldIndices := make([]int, 0, len(fields))
+	for i, s := range leftDF.series {
+		fields[i] = s.Field()
+		fieldIndices = append(fieldIndices, i)
+	}
+	midIndice := len(leftDF.series)
+	var j int
+	// rightSeriesIndices := make([]int, len(rightDF.series)-1)
+	for i, s := range rightDF.series {
+		// skip series used in join
+		if s.Name() == rightName {
+			continue
+		}
+		fields[midIndice+j] = s.Field()
+		fieldIndices = append(fieldIndices, i)
+		j++
+	}
+	schema := arrow.NewSchema(fields, nil)
+	rb := array.NewRecordBuilder(leftDF.pool, schema)
+	defer rb.Release()
+
+	leftSeries := leftDF.SeriesByName(leftName)
+	for li := 0; li < leftSeries.Len(); li++ {
+		leftVals := leftSeries.Values()
+		var rightIndices []int
+		switch lf := leftVals.(type) {
+		case []int32:
+			rightIndices = rightDF.SeriesByName(rightName).FindIndices(lf[li])
+		case []int64:
+			rightIndices = rightDF.SeriesByName(rightName).FindIndices(lf[li])
+		case []float32:
+			rightIndices = rightDF.SeriesByName(rightName).FindIndices(lf[li])
+		case []float64:
+			rightIndices = rightDF.SeriesByName(rightName).FindIndices(lf[li])
+		default:
+			panic("dataframe: left_join: unknown type")
+		}
+
+		var ri int
+		for {
+			for fi, b := range rb.Fields() {
+				var val interface{}
+				if fi < midIndice {
+					val = leftDF.Series(fieldIndices[fi]).Value(li)
+				} else {
+					if len(rightIndices) > 0 { //&& ri < len(rightIndices) {
+						rightIndice := rightIndices[ri]
+						val = rightDF.Series(fieldIndices[fi]).Value(rightIndice)
+					} else {
+						b.AppendNull()
+						continue
+					}
+				}
+
+				switch fb := b.(type) {
+				case *array.Int32Builder:
+					v := val.(int32)
+					fb.AppendValues([]int32{v}, nil)
+				case *array.Int64Builder:
+					v := val.(int64)
+					fb.AppendValues([]int64{v}, nil)
+				case *array.Float32Builder:
+					v := val.(float32)
+					fb.AppendValues([]float32{v}, nil)
+				case *array.Float64Builder:
+					v := val.(float64)
+					fb.AppendValues([]float64{v}, nil)
+				default:
+					panic("dataframe: left_join: unknown type")
+				}
+			}
+			ri++
+			if ri >= len(rightIndices) {
+				break
+			}
+		}
+	}
+	rec := rb.NewRecord()
+	defer rec.Release()
+
+	return NewFromRecords(leftDF.pool, []array.Record{rec})
+}
 
 // Max ...
 func (df DataFrame) Max() float64 {

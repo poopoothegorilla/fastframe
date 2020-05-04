@@ -1,6 +1,7 @@
 package dataframe_test
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -25,9 +26,10 @@ func TestNewFromRecords(t *testing.T) {
 
 		inRecords func(memory.Allocator) []array.Record
 
-		expNumCols int
-		expNumRows int
-		exp        []interface{}
+		expNumCols   int
+		expNumRows   int
+		exp          []interface{}
+		expNAIndices [][]int
 	}{
 		{
 			// TODO: CHANGE THE FIELDS TO BE ALL TYPES
@@ -53,15 +55,22 @@ func TestNewFromRecords(t *testing.T) {
 				bf64 := array.NewFloat64Builder(pool)
 				defer bf64.Release()
 
-				vi32 := []int32{33, 44, 55, 66, 77}
-				vi64 := []int64{333, 444, 555, 666, 777}
-				vf32 := []float32{3333, 4444, 5555, 6666, 7777}
-				vf64 := []float64{33333, 44444, 55555, 66666, 77777}
-
-				bi32.AppendValues(vi32, nil)
-				bi64.AppendValues(vi64, nil)
-				bf32.AppendValues(vf32, nil)
-				bf64.AppendValues(vf64, nil)
+				bi32.AppendValues(
+					[]int32{33, 44, 55, 66, 77},
+					[]bool{true, true, false, true, true},
+				)
+				bi64.AppendValues(
+					[]int64{333, 444, 555, 666, 777},
+					[]bool{true, false, true, false, true},
+				)
+				bf32.AppendValues(
+					[]float32{3333, 4444, 5555, 6666, 7777},
+					[]bool{false, true, true, true, false},
+				)
+				bf64.AppendValues(
+					[]float64{33333, 44444, 55555, 66666, 77777},
+					[]bool{false, true, false, true, false},
+				)
 
 				arri32 := bi32.NewArray()
 				defer arri32.Release()
@@ -88,6 +97,12 @@ func TestNewFromRecords(t *testing.T) {
 				[]float32{3333, 4444, 5555, 6666, 7777},
 				[]float64{33333, 44444, 55555, 66666, 77777},
 			},
+			expNAIndices: [][]int{
+				[]int{2},
+				[]int{1, 3},
+				[]int{0, 4},
+				[]int{0, 2, 4},
+			},
 		},
 	}
 
@@ -110,6 +125,7 @@ func TestNewFromRecords(t *testing.T) {
 
 			for i := range tt.exp {
 				assert.Equal(t, tt.exp[i], act.Series(i).Values())
+				assert.Equal(t, tt.expNAIndices[i], act.Series(i).NAIndices())
 			}
 		})
 	}
@@ -263,7 +279,7 @@ func TestSubtract(t *testing.T) {
 			actAdd := act.Subtract(act2)
 			defer actAdd.Release()
 
-			numR, numC := act.Dims()
+			numR, numC := actAdd.Dims()
 			require.Equal(t, tt.expNumCols, numC)
 			require.Equal(t, tt.expNumRows, numR)
 
@@ -356,7 +372,7 @@ func TestAdd(t *testing.T) {
 			actAdd := act.Add(act2)
 			defer actAdd.Release()
 
-			numR, numC := act.Dims()
+			numR, numC := actAdd.Dims()
 			require.Equal(t, tt.expNumCols, numC)
 			require.Equal(t, tt.expNumRows, numR)
 
@@ -935,6 +951,116 @@ func TestSelectRowsByIndices(t *testing.T) {
 
 			for i := range tt.exp {
 				assert.Equal(t, tt.exp[i], act.Series(i).Values())
+			}
+		})
+	}
+}
+
+func TestLeftJoin(t *testing.T) {
+	tests := []struct {
+		scenario string
+
+		inDataFrame   func(memory.Allocator) dataframe.DataFrame
+		inSeriesName  string
+		inDataFrame2  func(memory.Allocator) dataframe.DataFrame
+		inSeriesName2 string
+
+		expNumCols   int
+		expNumRows   int
+		exp          []interface{}
+		expNAIndices [][]int
+	}{
+		{
+			scenario: "left join dataframes",
+			inDataFrame: func(pool memory.Allocator) dataframe.DataFrame {
+				ss := []series.Series{
+					series.FromInt64(
+						pool,
+						arrow.Field{Name: "f1-i64", Type: arrow.PrimitiveTypes.Int64},
+						[]int64{1, 2, 3, 4, 5, 11},
+						nil,
+					),
+					series.FromInt32(
+						pool,
+						arrow.Field{Name: "f2-i32", Type: arrow.PrimitiveTypes.Int32},
+						[]int32{11, 22, 33, 44, 55, 1111},
+						nil,
+					),
+				}
+				for _, s := range ss {
+					defer s.Release()
+				}
+
+				return dataframe.NewFromSeries(pool, ss)
+			},
+			inSeriesName: "f1-i64",
+			inDataFrame2: func(pool memory.Allocator) dataframe.DataFrame {
+				ss := []series.Series{
+					series.FromInt64(
+						pool,
+						arrow.Field{Name: "f1-i64", Type: arrow.PrimitiveTypes.Int64},
+						[]int64{1, 2, 2, 5, 8, 9, 10},
+						nil,
+					),
+					series.FromInt32(
+						pool,
+						arrow.Field{Name: "f3-i32", Type: arrow.PrimitiveTypes.Int32},
+						[]int32{111, 222, 202020, 555, 888, 999, 101010},
+						nil,
+					),
+				}
+				for _, s := range ss {
+					defer s.Release()
+				}
+
+				return dataframe.NewFromSeries(pool, ss)
+			},
+			inSeriesName2: "f1-i64",
+			expNumCols:    3,
+			expNumRows:    7,
+			exp: []interface{}{
+				[]int64{1, 2, 2, 3, 4, 5, 11},
+				[]int32{11, 22, 0, 33, 44, 55, 1111},
+				[]int32{111, 222, 202020, 0, 0, 555, 0},
+			},
+			expNAIndices: [][]int{
+				[]int{},
+				[]int{2},
+				[]int{3, 4, 6},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			act := tt.inDataFrame(pool)
+			defer act.Release()
+			act2 := tt.inDataFrame2(pool)
+			defer act2.Release()
+
+			actJoin := dataframe.LeftJoin(act, tt.inSeriesName, act2, tt.inSeriesName2)
+			defer actJoin.Release()
+
+			table := array.NewTableReader(actJoin, 5)
+			n := 0
+			for table.Next() {
+				rec := table.Record()
+				for i, col := range rec.Columns() {
+					fmt.Printf("rec[%d][%q]: %v\n", n, rec.ColumnName(i), col)
+				}
+				n++
+			}
+
+			numR, numC := actJoin.Dims()
+			require.Equal(t, tt.expNumCols, numC)
+			require.Equal(t, tt.expNumRows, numR)
+
+			for i := range tt.exp {
+				assert.Equal(t, tt.exp[i], actJoin.Series(i).Values())
+				assert.Equal(t, tt.expNAIndices[i], actJoin.Series(i).NAIndices())
 			}
 		})
 	}
