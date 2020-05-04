@@ -97,6 +97,75 @@ func TestUnique(t *testing.T) {
 	}
 }
 
+func TestFindIndices(t *testing.T) {
+	tests := []struct {
+		scenario string
+
+		inSeries func(pool memory.Allocator) series.Series
+		inVal    interface{}
+
+		exp []int
+	}{
+		{
+			scenario: "int32 column",
+			inSeries: func(pool memory.Allocator) series.Series {
+				field := arrow.Field{Name: "f1-i32", Type: arrow.PrimitiveTypes.Int32}
+				vals := []int32{1, 3, 2, 3, 5, 3, 7}
+				nulls := []bool{false, true, true, false, true, true, true}
+				return series.FromInt32(pool, field, vals, nulls)
+			},
+			inVal: int32(3),
+			exp:   []int{1, 5},
+		},
+		{
+			scenario: "int64 column",
+			inSeries: func(pool memory.Allocator) series.Series {
+				field := arrow.Field{Name: "f1-i64", Type: arrow.PrimitiveTypes.Int64}
+				vals := []int64{1, 3, 2, 3, 5, 3, 7}
+				nulls := []bool{false, true, true, false, true, true, true}
+				return series.FromInt64(pool, field, vals, nulls)
+			},
+			inVal: int64(3),
+			exp:   []int{1, 5},
+		},
+		{
+			scenario: "float32 column",
+			inSeries: func(pool memory.Allocator) series.Series {
+				field := arrow.Field{Name: "f1-f32", Type: arrow.PrimitiveTypes.Float32}
+				vals := []float32{1, 3, 2, 3, 5, 3, 7}
+				nulls := []bool{false, true, true, false, true, true, true}
+				return series.FromFloat32(pool, field, vals, nulls)
+			},
+			inVal: float32(3),
+			exp:   []int{1, 5},
+		},
+		{
+			scenario: "float64 column",
+			inSeries: func(pool memory.Allocator) series.Series {
+				field := arrow.Field{Name: "f1-f64", Type: arrow.PrimitiveTypes.Float64}
+				vals := []float64{1, 3, 2, 3, 5, 3, 7}
+				nulls := []bool{false, true, true, false, true, true, true}
+				return series.FromFloat64(pool, field, vals, nulls)
+			},
+			inVal: float64(3),
+			exp:   []int{1, 5},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			actSeries := tt.inSeries(pool)
+			defer actSeries.Release()
+
+			act := actSeries.FindIndices(tt.inVal)
+			assert.Equal(t, tt.exp, act)
+		})
+	}
+}
+
 func TestNAIndices(t *testing.T) {
 	tests := []struct {
 		scenario string

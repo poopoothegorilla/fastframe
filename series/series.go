@@ -30,6 +30,8 @@ func FromArrow(pool memory.Allocator, field arrow.Field, column array.Interface)
 }
 
 // FromInt32 ...
+// TODO(poopoothegorilla): should the arrow.Field be replaced by a string param
+// and constructed in the function?
 func FromInt32(pool memory.Allocator, field arrow.Field, vals []int32, valid []bool) Series {
 	b := array.NewInt32Builder(pool)
 	defer b.Release()
@@ -219,6 +221,48 @@ func (s Series) Unique() Series {
 	default:
 		panic("series: unique: unsupported type")
 	}
+}
+
+// FindIndices ...
+func (s Series) FindIndices(val interface{}) []int {
+	s.Retain()
+	defer s.Release()
+
+	var result []int
+	switch vals := s.Values().(type) {
+	case []int32:
+		for i, v := range vals {
+			if v != val || s.IsNull(i) {
+				continue
+			}
+			result = append(result, i)
+		}
+	case []int64:
+		for i, v := range vals {
+			if v != val || s.IsNull(i) {
+				continue
+			}
+			result = append(result, i)
+		}
+	case []float32:
+		for i, v := range vals {
+			if v != val || s.IsNull(i) {
+				continue
+			}
+			result = append(result, i)
+		}
+	case []float64:
+		for i, v := range vals {
+			if v != val || s.IsNull(i) {
+				continue
+			}
+			result = append(result, i)
+		}
+	default:
+		panic("series: find_indices: unknown type")
+	}
+
+	return result
 }
 
 // NAIndices ...
