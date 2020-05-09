@@ -1,7 +1,6 @@
 package dataframe_test
 
 import (
-	"fmt"
 	"math"
 	"testing"
 
@@ -1020,12 +1019,12 @@ func TestLeftJoin(t *testing.T) {
 			expNumRows:    7,
 			exp: []interface{}{
 				[]int64{1, 2, 2, 3, 4, 5, 11},
-				[]int32{11, 22, 0, 33, 44, 55, 1111},
+				[]int32{11, 22, 22, 33, 44, 55, 1111},
 				[]int32{111, 222, 202020, 0, 0, 555, 0},
 			},
 			expNAIndices: [][]int{
 				[]int{},
-				[]int{2},
+				[]int{},
 				[]int{3, 4, 6},
 			},
 		},
@@ -1043,16 +1042,6 @@ func TestLeftJoin(t *testing.T) {
 
 			actJoin := dataframe.LeftJoin(act, tt.inSeriesName, act2, tt.inSeriesName2)
 			defer actJoin.Release()
-
-			table := array.NewTableReader(actJoin, 5)
-			n := 0
-			for table.Next() {
-				rec := table.Record()
-				for i, col := range rec.Columns() {
-					fmt.Printf("rec[%d][%q]: %v\n", n, rec.ColumnName(i), col)
-				}
-				n++
-			}
 
 			numR, numC := actJoin.Dims()
 			require.Equal(t, tt.expNumCols, numC)

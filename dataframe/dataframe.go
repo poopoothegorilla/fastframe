@@ -6,6 +6,7 @@ import (
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
+	"github.com/apache/arrow/go/arrow/bitutil"
 	"github.com/apache/arrow/go/arrow/memory"
 	"github.com/poopoothegorilla/fastframe/series"
 	"gonum.org/v1/gonum/mat"
@@ -34,6 +35,7 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 	ss := make([]series.Series, len(schema.Fields()))
 
 	for i, field := range schema.Fields() {
+		var nulls []bool
 		switch field.Type {
 		case arrow.PrimitiveTypes.Int32:
 			var vals []int32
@@ -41,17 +43,23 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
 				}
+				var nullMask []byte
 				var newVals []int32
 				switch c := record.Column(i).(type) {
 				case *array.Int32:
 					newVals = c.Int32Values()
+					nullMask = c.NullBitmapBytes()
 				case series.Series:
 					newVals = c.Interface.(*array.Int32).Int32Values()
+					nullMask = c.NullBitmapBytes()
+				}
+				for i := range newVals {
+					nulls = append(nulls, bitutil.BitIsSet(nullMask, i))
 				}
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromInt32(pool, field, vals, nil)
+				s := series.FromInt32(pool, field, vals, nulls)
 				ss[i] = s
 			}
 		case arrow.PrimitiveTypes.Int64:
@@ -60,17 +68,23 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
 				}
+				var nullMask []byte
 				var newVals []int64
 				switch c := record.Column(i).(type) {
 				case *array.Int64:
 					newVals = c.Int64Values()
+					nullMask = c.NullBitmapBytes()
 				case series.Series:
 					newVals = c.Interface.(*array.Int64).Int64Values()
+					nullMask = c.NullBitmapBytes()
+				}
+				for i := range newVals {
+					nulls = append(nulls, bitutil.BitIsSet(nullMask, i))
 				}
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromInt64(pool, field, vals, nil)
+				s := series.FromInt64(pool, field, vals, nulls)
 				ss[i] = s
 			}
 		case arrow.PrimitiveTypes.Float32:
@@ -79,17 +93,23 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
 				}
+				var nullMask []byte
 				var newVals []float32
 				switch c := record.Column(i).(type) {
 				case *array.Float32:
 					newVals = c.Float32Values()
+					nullMask = c.NullBitmapBytes()
 				case series.Series:
 					newVals = c.Interface.(*array.Float32).Float32Values()
+					nullMask = c.NullBitmapBytes()
+				}
+				for i := range newVals {
+					nulls = append(nulls, bitutil.BitIsSet(nullMask, i))
 				}
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromFloat32(pool, field, vals, nil)
+				s := series.FromFloat32(pool, field, vals, nulls)
 				ss[i] = s
 			}
 		case arrow.PrimitiveTypes.Float64:
@@ -98,17 +118,23 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
 				}
+				var nullMask []byte
 				var newVals []float64
 				switch c := record.Column(i).(type) {
 				case *array.Float64:
 					newVals = c.Float64Values()
+					nullMask = c.NullBitmapBytes()
 				case series.Series:
 					newVals = c.Interface.(*array.Float64).Float64Values()
+					nullMask = c.NullBitmapBytes()
+				}
+				for i := range newVals {
+					nulls = append(nulls, bitutil.BitIsSet(nullMask, i))
 				}
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromFloat64(pool, field, vals, nil)
+				s := series.FromFloat64(pool, field, vals, nulls)
 				ss[i] = s
 			}
 		default:
