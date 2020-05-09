@@ -60,6 +60,9 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
 				s := series.FromInt32(pool, field, vals, nulls)
+				if ss[i].Interface != nil {
+					ss[i].Release()
+				}
 				ss[i] = s
 			}
 		case arrow.PrimitiveTypes.Int64:
@@ -85,6 +88,9 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
 				s := series.FromInt64(pool, field, vals, nulls)
+				if ss[i].Interface != nil {
+					ss[i].Release()
+				}
 				ss[i] = s
 			}
 		case arrow.PrimitiveTypes.Float32:
@@ -110,6 +116,9 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
 				s := series.FromFloat32(pool, field, vals, nulls)
+				if ss[i].Interface != nil {
+					ss[i].Release()
+				}
 				ss[i] = s
 			}
 		case arrow.PrimitiveTypes.Float64:
@@ -135,6 +144,9 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
 				s := series.FromFloat64(pool, field, vals, nulls)
+				if ss[i].Interface != nil {
+					ss[i].Release()
+				}
 				ss[i] = s
 			}
 		default:

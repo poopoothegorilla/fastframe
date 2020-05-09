@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/apache/arrow/go/arrow"
+	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
 	gotadataframe "github.com/go-gota/gota/dataframe"
 	gotaseries "github.com/go-gota/gota/series"
@@ -15,6 +16,44 @@ import (
 	"github.com/poopoothegorilla/fastframe/series"
 	"github.com/ptiger10/tada"
 )
+
+func BenchmarkNewFromRecords(b *testing.B) {
+	colVals := []int{10, 100, 1000}
+	rowVals := []int{2}
+
+	for _, colVal := range colVals {
+		for _, rowVal := range rowVals {
+			b.Run(fmt.Sprintf("size=%vcolsx%vrows", colVal, rowVal), func(b *testing.B) {
+				benchmarkNewFromRecords(b, colVal, rowVal)
+			})
+		}
+	}
+}
+
+func benchmarkNewFromRecords(b *testing.B, cols, rows int) {
+	pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer pool.AssertSize(b, 0)
+	recordSize := 1
+	t := arrow.PrimitiveTypes.Float32
+
+	fields := make([]arrow.Field, cols)
+	for i := 0; i < cols; i++ {
+		name := strconv.Itoa(i)
+		fields[i] = arrow.Field{Name: name, Type: t}
+	}
+	records := make([]array.Record, rows)
+	for i := 0; i < rows; i++ {
+		record := newArrowRecord(pool, recordSize, fields)
+		defer record.Release()
+		records[i] = record
+	}
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		df := dataframe.NewFromRecords(pool, records)
+		df.Release()
+	}
+}
 
 func BenchmarkAdd(b *testing.B) {
 	vals := []int{10, 100, 1000}
@@ -523,6 +562,8 @@ func newTadaTestSeries(numVals int, t arrow.DataType) *tada.Series {
 			v[j] = rand.Float64()
 		}
 		vals = v
+	default:
+		panic("unknown type")
 	}
 	return tada.NewSeries(vals)
 }
@@ -564,6 +605,47 @@ func newGotaTestSeries(numVals int, tt arrow.DataType) gotaseries.Series {
 		vals = v
 
 		t = gotaseries.Float
+	default:
+		panic("unknown type")
 	}
 	return gotaseries.New(vals, t, "testing")
+}
+
+func newArrowRecord(pool memory.Allocator, numVals int, fields []arrow.Field) array.Record {
+	schema := arrow.NewSchema(fields, nil)
+
+	rb := array.NewRecordBuilder(pool, schema)
+	defer rb.Release()
+	for _, fb := range rb.Fields() {
+		switch b := fb.(type) {
+		case *array.Int32Builder:
+			v := make([]int32, numVals)
+			for j := 0; j < numVals; j++ {
+				v[j] = rand.Int31()
+			}
+			b.AppendValues(v, nil)
+		case *array.Int64Builder:
+			v := make([]int64, numVals)
+			for j := 0; j < numVals; j++ {
+				v[j] = rand.Int63()
+			}
+			b.AppendValues(v, nil)
+		case *array.Float32Builder:
+			v := make([]float32, numVals)
+			for j := 0; j < numVals; j++ {
+				v[j] = rand.Float32()
+			}
+			b.AppendValues(v, nil)
+		case *array.Float64Builder:
+			v := make([]float64, numVals)
+			for j := 0; j < numVals; j++ {
+				v[j] = rand.Float64()
+			}
+			b.AppendValues(v, nil)
+		default:
+			panic("unknown type")
+		}
+	}
+
+	return rb.NewRecord()
 }

@@ -864,6 +864,8 @@ func newTadaTestSeries(numVals int, t arrow.DataType) *tada.Series {
 			v[j] = rand.Float64()
 		}
 		vals = v
+	default:
+		panic("unknown type")
 	}
 	return tada.NewSeries(vals)
 }
@@ -905,6 +907,8 @@ func newGotaTestSeries(numVals int, tt arrow.DataType) gotaseries.Series {
 		vals = v
 
 		t = gotaseries.Float
+	default:
+		panic("unknown type")
 	}
 	return gotaseries.New(vals, t, "testing")
 }

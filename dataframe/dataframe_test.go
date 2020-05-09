@@ -19,6 +19,8 @@ var (
 	_ mat.Matrix  = &dataframe.DataFrame{}
 )
 
+// TODO(poopoothegorilla): this needs to have a test case with multiple records
+// being added.
 func TestNewFromRecords(t *testing.T) {
 	tests := []struct {
 		scenario string
