@@ -2,14 +2,18 @@ package dataframe_test
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"testing"
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/memory"
+	gotadataframe "github.com/go-gota/gota/dataframe"
+	gotaseries "github.com/go-gota/gota/series"
 	"github.com/poopoothegorilla/fastframe/dataframe"
 	"github.com/poopoothegorilla/fastframe/series"
+	"github.com/ptiger10/tada"
 )
 
 func BenchmarkAdd(b *testing.B) {
@@ -29,13 +33,10 @@ func benchmarkAdd(b *testing.B, cols int) {
 
 	columns := make([]series.Series, cols)
 	for i := 0; i < cols; i++ {
-		vals := make([]float64, rows)
-		for j := 0; j < rows; j++ {
-			vals[j] = rand.Float64()
-		}
-		field := arrow.Field{Name: strconv.Itoa(i), Type: arrow.PrimitiveTypes.Float64}
-		ss := series.FromFloat64(pool, field, vals, nil)
+		name := strconv.Itoa(i)
+		ss := newTestSeries(rows, arrow.PrimitiveTypes.Float64, pool, rows/2)
 		defer ss.Release()
+		ss = ss.Rename(name)
 
 		columns[i] = ss
 	}
@@ -49,6 +50,151 @@ func benchmarkAdd(b *testing.B, cols int) {
 	for n := 0; n < b.N; n++ {
 		df3 := df.Add(df2)
 		df3.Release()
+	}
+}
+
+func BenchmarkLeftJoin(b *testing.B) {
+	colVals := []int{10, 100, 1000}
+	rowVals := []int{1, 10, 100}
+
+	for _, colVal := range colVals {
+		for _, rowVal := range rowVals {
+			b.Run(fmt.Sprintf("size=%vcolsx%vrows", colVal, rowVal), func(b *testing.B) {
+				benchmarkLeftJoin(b, colVal, rowVal)
+			})
+		}
+		for _, rowVal := range rowVals {
+			b.Run(fmt.Sprintf("tada/size=%vcolsx%vrows", colVal, rowVal), func(b *testing.B) {
+				benchmarkTadaLeftJoin(b, colVal, rowVal)
+			})
+		}
+		for _, rowVal := range rowVals {
+			b.Run(fmt.Sprintf("gota/size=%vcolsx%vrows", colVal, rowVal), func(b *testing.B) {
+				benchmarkGotaLeftJoin(b, colVal, rowVal)
+			})
+		}
+	}
+}
+
+func benchmarkLeftJoin(b *testing.B, cols, rows int) {
+	pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer pool.AssertSize(b, 0)
+
+	columns := make([]series.Series, cols)
+	for i := 0; i < cols; i++ {
+		name := strconv.Itoa(i)
+		if i == 0 {
+			name = "join-column"
+		}
+		ss := newTestSeries(rows, arrow.PrimitiveTypes.Float64, pool, 0)
+		defer ss.Release()
+		ss = ss.Rename(name)
+
+		columns[i] = ss
+	}
+	columns2 := make([]series.Series, cols)
+	for i := 0; i < cols; i++ {
+		name := strconv.Itoa(i)
+		if i == 0 {
+			name = "join-column"
+		}
+		ss := newTestSeries(rows, arrow.PrimitiveTypes.Float64, pool, 0)
+		defer ss.Release()
+		ss = ss.Rename(name)
+
+		columns2[i] = ss
+	}
+
+	df := dataframe.NewFromSeries(pool, columns)
+	defer df.Release()
+	df2 := dataframe.NewFromSeries(pool, columns2)
+	defer df2.Release()
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		df3 := dataframe.LeftJoin(df, "join-column", df2, "join-column")
+		df3.Release()
+	}
+}
+
+func benchmarkTadaLeftJoin(b *testing.B, cols, rows int) {
+	columns := make([]*tada.Series, cols)
+	for i := 0; i < cols; i++ {
+		ss := newTadaTestSeries(rows, arrow.PrimitiveTypes.Float64)
+		if i == 0 {
+			data := []int{}
+			for j := 0; j < rows; j++ {
+				data = append(data, j)
+			}
+			ss = tada.NewSeries(data)
+			ss.SetName("join-column")
+		}
+		columns[i] = ss
+	}
+	columns2 := make([]*tada.Series, cols)
+	for i := 0; i < cols; i++ {
+		ss := newTadaTestSeries(rows, arrow.PrimitiveTypes.Float64)
+		if i == 0 {
+			data := []int{}
+			for j := 0; j < rows; j++ {
+				data = append(data, j)
+			}
+			ss = tada.NewSeries(data)
+			ss.SetName("join-column")
+		}
+		columns2[i] = ss
+	}
+
+	df, err := tada.ConcatSeries(columns...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	df2, err := tada.ConcatSeries(columns2...)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_, err := df.Merge(df2, tada.JoinOptionHow("left"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func benchmarkGotaLeftJoin(b *testing.B, cols, rows int) {
+	columns := make([]gotaseries.Series, cols)
+	for i := 0; i < cols; i++ {
+		ss := newGotaTestSeries(rows, arrow.PrimitiveTypes.Float64)
+		if i == 0 {
+			data := []int{}
+			for j := 0; j < rows; j++ {
+				data = append(data, j)
+			}
+			ss = gotaseries.New(data, gotaseries.Float, "join-column")
+		}
+		columns[i] = ss
+	}
+	columns2 := make([]gotaseries.Series, cols)
+	for i := 0; i < cols; i++ {
+		ss := newGotaTestSeries(rows, arrow.PrimitiveTypes.Float64)
+		if i == 0 {
+			data := []int{}
+			for j := 0; j < rows; j++ {
+				data = append(data, j)
+			}
+			ss = gotaseries.New(data, gotaseries.Float, "join-column")
+		}
+		columns2[i] = ss
+	}
+
+	df := gotadataframe.New(columns...)
+	df2 := gotadataframe.New(columns2...)
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		df.LeftJoin(df2, "join-column")
 	}
 }
 
@@ -295,4 +441,129 @@ func benchmarkSeriesDot(b *testing.B, cols int) {
 		s.Release()
 		s2.Release()
 	}
+}
+
+////////////
+// HELPERS
+////////////
+
+func newTestSeries(numVals int, t arrow.DataType, pool memory.Allocator, numNAs int) series.Series {
+	field := arrow.Field{Name: "testing", Type: t}
+	var s series.Series
+
+	vNAs := make([]bool, numVals)
+	for j := 0; j < len(vNAs); j++ {
+		if j < numNAs {
+			vNAs[j] = false
+			continue
+		}
+		vNAs[j] = true
+	}
+	rand.Shuffle(len(vNAs), func(i, j int) {
+		vNAs[i], vNAs[j] = vNAs[j], vNAs[i]
+	})
+
+	switch t {
+	case arrow.PrimitiveTypes.Int32:
+		v := make([]int32, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Int31()
+		}
+		s = series.FromInt32(pool, field, v, vNAs)
+	case arrow.PrimitiveTypes.Int64:
+		v := make([]int64, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Int63()
+		}
+		s = series.FromInt64(pool, field, v, vNAs)
+	case arrow.PrimitiveTypes.Float32:
+		v := make([]float32, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Float32()
+		}
+		s = series.FromFloat32(pool, field, v, vNAs)
+	case arrow.PrimitiveTypes.Float64:
+		v := make([]float64, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Float64()
+		}
+		s = series.FromFloat64(pool, field, v, vNAs)
+	default:
+		panic("unknown type")
+	}
+
+	return s
+}
+
+func newTadaTestSeries(numVals int, t arrow.DataType) *tada.Series {
+	var vals interface{}
+
+	switch t {
+	case arrow.PrimitiveTypes.Int32:
+		v := make([]int32, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Int31()
+		}
+		vals = v
+	case arrow.PrimitiveTypes.Int64:
+		v := make([]int64, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Int63()
+		}
+		vals = v
+	case arrow.PrimitiveTypes.Float32:
+		v := make([]float32, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Float32()
+		}
+		vals = v
+	case arrow.PrimitiveTypes.Float64:
+		v := make([]float64, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Float64()
+		}
+		vals = v
+	}
+	return tada.NewSeries(vals)
+}
+
+func newGotaTestSeries(numVals int, tt arrow.DataType) gotaseries.Series {
+	var vals interface{}
+	var t gotaseries.Type
+
+	switch tt {
+	case arrow.PrimitiveTypes.Int32:
+		v := make([]int32, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Int31()
+		}
+		vals = v
+
+		t = gotaseries.Int
+	case arrow.PrimitiveTypes.Int64:
+		v := make([]int64, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Int63()
+		}
+		vals = v
+
+		t = gotaseries.Int
+	case arrow.PrimitiveTypes.Float32:
+		v := make([]float32, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Float32()
+		}
+		vals = v
+
+		t = gotaseries.Float
+	case arrow.PrimitiveTypes.Float64:
+		v := make([]float64, numVals)
+		for j := 0; j < numVals; j++ {
+			v[j] = rand.Float64()
+		}
+		vals = v
+
+		t = gotaseries.Float
+	}
+	return gotaseries.New(vals, t, "testing")
 }
