@@ -20,29 +20,32 @@ type DataFrame struct {
 
 // NewFromRecords ...
 // TODO(poopoothegorilla): optimizations are needed here
-// TODO(poopoothegorilla): nulls are needed
 func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
+	var numRows int64
+	var schema *arrow.Schema
 	for _, record := range records {
 		record.Retain()
 		defer record.Release()
+		numRows += record.NumRows()
+		if schema == nil {
+			schema = records[0].Schema()
+		}
+		if !schema.Equal(record.Schema()) {
+			panic("dataframe: new_from_records: record schemas do not match")
+		}
 	}
 
 	if len(records) <= 0 {
 		panic("dataframe: new_from_records: no records")
 	}
 
-	schema := records[0].Schema()
 	ss := make([]series.Series, len(schema.Fields()))
-
 	for i, field := range schema.Fields() {
-		var nulls []bool
+		nulls := make([]bool, 0, int(numRows))
 		switch field.Type {
 		case arrow.PrimitiveTypes.Int32:
-			var vals []int32
+			vals := make([]int32, 0, int(numRows))
 			for _, record := range records {
-				if !schema.Equal(record.Schema()) {
-					panic("dataframe: new_from_records: record schemas do not match")
-				}
 				var nullMask []byte
 				var newVals []int32
 				switch c := record.Column(i).(type) {
@@ -53,20 +56,17 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					newVals = c.Interface.(*array.Int32).Int32Values()
 					nullMask = c.NullBitmapBytes()
 				}
-				for i := range newVals {
-					nulls = append(nulls, bitutil.BitIsSet(nullMask, i))
+				for j := range newVals {
+					nulls = append(nulls, bitutil.BitIsSet(nullMask, j))
 				}
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromInt32(pool, field, vals, nulls)
-				if ss[i].Interface != nil {
-					ss[i].Release()
-				}
-				ss[i] = s
 			}
+			s := series.FromInt32(pool, field, vals, nulls)
+			ss[i] = s
 		case arrow.PrimitiveTypes.Int64:
-			var vals []int64
+			vals := make([]int64, 0, int(numRows))
 			for _, record := range records {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
@@ -87,14 +87,11 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromInt64(pool, field, vals, nulls)
-				if ss[i].Interface != nil {
-					ss[i].Release()
-				}
-				ss[i] = s
 			}
+			s := series.FromInt64(pool, field, vals, nulls)
+			ss[i] = s
 		case arrow.PrimitiveTypes.Float32:
-			var vals []float32
+			vals := make([]float32, 0, int(numRows))
 			for _, record := range records {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
@@ -115,14 +112,11 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromFloat32(pool, field, vals, nulls)
-				if ss[i].Interface != nil {
-					ss[i].Release()
-				}
-				ss[i] = s
 			}
+			s := series.FromFloat32(pool, field, vals, nulls)
+			ss[i] = s
 		case arrow.PrimitiveTypes.Float64:
-			var vals []float64
+			vals := make([]float64, 0, int(numRows))
 			for _, record := range records {
 				if !schema.Equal(record.Schema()) {
 					panic("dataframe: new_from_records: record schemas do not match")
@@ -143,12 +137,9 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 				vals = append(vals, newVals...)
 				// TODO(poopoothegorilla): this keeps creating and overwriting old
 				// series. There should be some easier ways to optimize this.
-				s := series.FromFloat64(pool, field, vals, nulls)
-				if ss[i].Interface != nil {
-					ss[i].Release()
-				}
-				ss[i] = s
 			}
+			s := series.FromFloat64(pool, field, vals, nulls)
+			ss[i] = s
 		default:
 			panic("dataframe: new_from_records: unsupported type")
 		}
