@@ -30,6 +30,8 @@ func FromArrow(pool memory.Allocator, field arrow.Field, column array.Interface)
 }
 
 // FromInt32 ...
+// TODO(poopoothegorilla): might be worth creating a pool of builders and
+// recycling them.
 // TODO(poopoothegorilla): should the arrow.Field be replaced by a string param
 // and constructed in the function?
 func FromInt32(pool memory.Allocator, field arrow.Field, vals []int32, valid []bool) Series {
