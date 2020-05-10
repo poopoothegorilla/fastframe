@@ -21,6 +21,10 @@ type DataFrame struct {
 // NewFromRecords ...
 // TODO(poopoothegorilla): optimizations are needed here
 func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
+	if len(records) <= 0 {
+		panic("dataframe: new_from_records: no records")
+	}
+
 	var numRows int64
 	var schema *arrow.Schema
 	for _, record := range records {
@@ -33,10 +37,6 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 		// TODO(poopoothegorilla): should records be validated for similarity?
 		// NOTE(poopoothegorilla): schema Equal in arrow pkg uses reflect which has
 		// a performance impact
-	}
-
-	if len(records) <= 0 {
-		panic("dataframe: new_from_records: no records")
 	}
 
 	ss := make([]series.Series, len(schema.Fields()))
@@ -63,8 +63,7 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					rowi++
 				}
 			}
-			s := series.FromInt32(pool, field, vals, nulls)
-			ss[i] = s
+			ss[i] = series.FromInt32(pool, field, vals, nulls)
 		case arrow.PrimitiveTypes.Int64:
 			vals := make([]int64, int(numRows))
 			for _, record := range records {
@@ -84,8 +83,7 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					rowi++
 				}
 			}
-			s := series.FromInt64(pool, field, vals, nulls)
-			ss[i] = s
+			ss[i] = series.FromInt64(pool, field, vals, nulls)
 		case arrow.PrimitiveTypes.Float32:
 			vals := make([]float32, int(numRows))
 			for _, record := range records {
@@ -105,8 +103,7 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					rowi++
 				}
 			}
-			s := series.FromFloat32(pool, field, vals, nulls)
-			ss[i] = s
+			ss[i] = series.FromFloat32(pool, field, vals, nulls)
 		case arrow.PrimitiveTypes.Float64:
 			vals := make([]float64, int(numRows))
 			for _, record := range records {
@@ -126,8 +123,7 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 					rowi++
 				}
 			}
-			s := series.FromFloat64(pool, field, vals, nulls)
-			ss[i] = s
+			ss[i] = series.FromFloat64(pool, field, vals, nulls)
 		default:
 			panic("dataframe: new_from_records: unsupported type")
 		}
