@@ -68,9 +68,6 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 		case arrow.PrimitiveTypes.Int64:
 			vals := make([]int64, 0, int(numRows))
 			for _, record := range records {
-				if !schema.Equal(record.Schema()) {
-					panic("dataframe: new_from_records: record schemas do not match")
-				}
 				var nullMask []byte
 				var newVals []int64
 				switch c := record.Column(i).(type) {
@@ -93,9 +90,6 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 		case arrow.PrimitiveTypes.Float32:
 			vals := make([]float32, 0, int(numRows))
 			for _, record := range records {
-				if !schema.Equal(record.Schema()) {
-					panic("dataframe: new_from_records: record schemas do not match")
-				}
 				var nullMask []byte
 				var newVals []float32
 				switch c := record.Column(i).(type) {
@@ -118,9 +112,6 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 		case arrow.PrimitiveTypes.Float64:
 			vals := make([]float64, 0, int(numRows))
 			for _, record := range records {
-				if !schema.Equal(record.Schema()) {
-					panic("dataframe: new_from_records: record schemas do not match")
-				}
 				var nullMask []byte
 				var newVals []float64
 				switch c := record.Column(i).(type) {
