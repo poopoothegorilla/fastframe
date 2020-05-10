@@ -55,6 +55,41 @@ func benchmarkNewFromRecords(b *testing.B, cols, rows int) {
 	}
 }
 
+func BenchmarkSeries(b *testing.B) {
+	vals := []int{10, 100, 1000}
+
+	for _, val := range vals {
+		b.Run(fmt.Sprintf("size=%v", val), func(b *testing.B) {
+			benchmarkSeries(b, val)
+		})
+	}
+}
+
+func benchmarkSeries(b *testing.B, cols int) {
+	pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer pool.AssertSize(b, 0)
+	rows := 2
+
+	columns := make([]series.Series, cols)
+	for i := 0; i < cols; i++ {
+		name := strconv.Itoa(i)
+		ss := newTestSeries(rows, arrow.PrimitiveTypes.Float64, pool, rows/2)
+		defer ss.Release()
+		ss = ss.Rename(name)
+
+		columns[i] = ss
+	}
+
+	df := dataframe.NewFromSeries(pool, columns)
+	defer df.Release()
+	in := cols / 2
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_ = df.Series(in)
+	}
+}
+
 func BenchmarkAdd(b *testing.B) {
 	vals := []int{10, 100, 1000}
 

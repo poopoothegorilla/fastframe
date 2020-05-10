@@ -236,9 +236,6 @@ func (df DataFrame) Retain() {
 
 // Series ...
 func (df DataFrame) Series(i int) series.Series {
-	df.Retain()
-	defer df.Release()
-
 	return df.series[i]
 }
 

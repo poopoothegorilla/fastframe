@@ -99,20 +99,23 @@ func (s Series) Column() *array.Column {
 // Value ...
 func (s Series) Value(i int) interface{} {
 	s.Retain()
-	defer s.Release()
 
+	var v interface{}
 	switch s.field.Type {
 	case arrow.PrimitiveTypes.Int32:
-		return s.Interface.(*array.Int32).Value(i)
+		v = s.Interface.(*array.Int32).Value(i)
 	case arrow.PrimitiveTypes.Int64:
-		return s.Interface.(*array.Int64).Value(i)
+		v = s.Interface.(*array.Int64).Value(i)
 	case arrow.PrimitiveTypes.Float32:
-		return s.Interface.(*array.Float32).Value(i)
+		v = s.Interface.(*array.Float32).Value(i)
 	case arrow.PrimitiveTypes.Float64:
-		return s.Interface.(*array.Float64).Value(i)
+		v = s.Interface.(*array.Float64).Value(i)
 	default:
 		panic("series: unknown type")
 	}
+
+	s.Release()
+	return v
 }
 
 // Values ...
