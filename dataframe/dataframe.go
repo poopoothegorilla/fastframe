@@ -602,36 +602,49 @@ func LeftJoin(leftDF DataFrame, leftName string, rightDF DataFrame, rightName st
 		var ri int
 		for {
 			for fi, b := range rb.Fields() {
-				var val interface{}
 				if fi < midIndice {
-					val = leftDF.Series(fieldIndices[fi]).Value(li)
-				} else {
-					if len(rightIndices) > 0 { //&& ri < len(rightIndices) {
-						rightIndice := rightIndices[ri]
-						val = rightDF.Series(fieldIndices[fi]).Value(rightIndice)
-					} else {
-						b.AppendNull()
-						continue
+					switch fb := b.(type) {
+					case *array.Int32Builder:
+						v := leftDF.Series(fieldIndices[fi]).Int32(li)
+						fb.AppendValues([]int32{v}, nil)
+					case *array.Int64Builder:
+						v := leftDF.Series(fieldIndices[fi]).Int64(li)
+						fb.AppendValues([]int64{v}, nil)
+					case *array.Float32Builder:
+						v := leftDF.Series(fieldIndices[fi]).Float32(li)
+						fb.AppendValues([]float32{v}, nil)
+					case *array.Float64Builder:
+						v := leftDF.Series(fieldIndices[fi]).Float64(li)
+						fb.AppendValues([]float64{v}, nil)
+					default:
+						panic("dataframe: left_join: unknown type")
 					}
+					continue
+				}
+				if len(rightIndices) > 0 {
+					rightIndice := rightIndices[ri]
+					switch fb := b.(type) {
+					case *array.Int32Builder:
+						v := rightDF.Series(fieldIndices[fi]).Int32(rightIndice)
+						fb.AppendValues([]int32{v}, nil)
+					case *array.Int64Builder:
+						v := rightDF.Series(fieldIndices[fi]).Int64(rightIndice)
+						fb.AppendValues([]int64{v}, nil)
+					case *array.Float32Builder:
+						v := rightDF.Series(fieldIndices[fi]).Float32(rightIndice)
+						fb.AppendValues([]float32{v}, nil)
+					case *array.Float64Builder:
+						v := rightDF.Series(fieldIndices[fi]).Float64(rightIndice)
+						fb.AppendValues([]float64{v}, nil)
+					default:
+						panic("dataframe: left_join: unknown type")
+					}
+					continue
 				}
 
-				switch fb := b.(type) {
-				case *array.Int32Builder:
-					v := val.(int32)
-					fb.AppendValues([]int32{v}, nil)
-				case *array.Int64Builder:
-					v := val.(int64)
-					fb.AppendValues([]int64{v}, nil)
-				case *array.Float32Builder:
-					v := val.(float32)
-					fb.AppendValues([]float32{v}, nil)
-				case *array.Float64Builder:
-					v := val.(float64)
-					fb.AppendValues([]float64{v}, nil)
-				default:
-					panic("dataframe: left_join: unknown type")
-				}
+				b.AppendNull()
 			}
+
 			ri++
 			if ri >= len(rightIndices) {
 				break

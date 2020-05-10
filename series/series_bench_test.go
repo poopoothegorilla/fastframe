@@ -44,6 +44,38 @@ func benchmarkValue(b *testing.B, numVals int, t arrow.DataType) {
 	}
 }
 
+func BenchmarkFloat32(b *testing.B) {
+	vals := []int{10, 100, 1000}
+	dataTypes := []arrow.DataType{
+		arrow.PrimitiveTypes.Int32,
+		arrow.PrimitiveTypes.Int64,
+		arrow.PrimitiveTypes.Float32,
+		arrow.PrimitiveTypes.Float64,
+	}
+
+	for _, dataType := range dataTypes {
+		for _, val := range vals {
+			b.Run(fmt.Sprintf("%s=%v", dataType, val), func(b *testing.B) {
+				benchmarkFloat32(b, val, dataType)
+			})
+		}
+	}
+}
+
+func benchmarkFloat32(b *testing.B, numVals int, t arrow.DataType) {
+	pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	defer pool.AssertSize(b, 0)
+
+	s := newTestSeries(numVals, t, pool, numVals/2)
+	defer s.Release()
+
+	in := numVals / 2
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_ = s.Float32(in)
+	}
+}
+
 func BenchmarkAppend(b *testing.B) {
 	vals := []int{10, 100, 1000}
 	dataTypes := []arrow.DataType{

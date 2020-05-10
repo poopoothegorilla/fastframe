@@ -118,6 +118,94 @@ func (s Series) Value(i int) interface{} {
 	return v
 }
 
+// Int32 ...
+func (s Series) Int32(i int) int32 {
+	s.Retain()
+
+	var v int32
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+		v = s.Interface.(*array.Int32).Value(i)
+	case arrow.PrimitiveTypes.Int64:
+		v = int32(s.Interface.(*array.Int64).Value(i))
+	case arrow.PrimitiveTypes.Float32:
+		v = int32(s.Interface.(*array.Float32).Value(i))
+	case arrow.PrimitiveTypes.Float64:
+		v = int32(s.Interface.(*array.Float64).Value(i))
+	default:
+		panic("series: unknown type")
+	}
+
+	s.Release()
+	return v
+}
+
+// Int64 ...
+func (s Series) Int64(i int) int64 {
+	s.Retain()
+
+	var v int64
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+		v = int64(s.Interface.(*array.Int32).Value(i))
+	case arrow.PrimitiveTypes.Int64:
+		v = s.Interface.(*array.Int64).Value(i)
+	case arrow.PrimitiveTypes.Float32:
+		v = int64(s.Interface.(*array.Float32).Value(i))
+	case arrow.PrimitiveTypes.Float64:
+		v = int64(s.Interface.(*array.Float64).Value(i))
+	default:
+		panic("series: unknown type")
+	}
+
+	s.Release()
+	return v
+}
+
+// Float32 ...
+func (s Series) Float32(i int) float32 {
+	s.Retain()
+
+	var v float32
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+		v = float32(s.Interface.(*array.Int32).Value(i))
+	case arrow.PrimitiveTypes.Int64:
+		v = float32(s.Interface.(*array.Int64).Value(i))
+	case arrow.PrimitiveTypes.Float32:
+		v = s.Interface.(*array.Float32).Value(i)
+	case arrow.PrimitiveTypes.Float64:
+		v = float32(s.Interface.(*array.Float64).Value(i))
+	default:
+		panic("series: unknown type")
+	}
+
+	s.Release()
+	return v
+}
+
+// Float64 ...
+func (s Series) Float64(i int) float64 {
+	s.Retain()
+
+	var v float64
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+		v = float64(s.Interface.(*array.Int32).Value(i))
+	case arrow.PrimitiveTypes.Int64:
+		v = float64(s.Interface.(*array.Int64).Value(i))
+	case arrow.PrimitiveTypes.Float32:
+		v = float64(s.Interface.(*array.Float32).Value(i))
+	case arrow.PrimitiveTypes.Float64:
+		v = s.Interface.(*array.Float64).Value(i)
+	default:
+		panic("series: unknown type")
+	}
+
+	s.Release()
+	return v
+}
+
 // Values ...
 func (s Series) Values() interface{} {
 	s.Retain()
