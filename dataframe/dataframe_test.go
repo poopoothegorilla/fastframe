@@ -1057,6 +1057,106 @@ func TestLeftJoin(t *testing.T) {
 	}
 }
 
+func TestRightJoin(t *testing.T) {
+	tests := []struct {
+		scenario string
+
+		inDataFrame   func(memory.Allocator) dataframe.DataFrame
+		inSeriesName  string
+		inDataFrame2  func(memory.Allocator) dataframe.DataFrame
+		inSeriesName2 string
+
+		expNumCols   int
+		expNumRows   int
+		exp          []interface{}
+		expNAIndices [][]int
+	}{
+		{
+			scenario: "right join dataframes",
+			inDataFrame: func(pool memory.Allocator) dataframe.DataFrame {
+				ss := []series.Series{
+					series.FromInt64(
+						pool,
+						arrow.Field{Name: "f1-i64", Type: arrow.PrimitiveTypes.Int64},
+						[]int64{1, 2, 3, 4, 5, 11},
+						nil,
+					),
+					series.FromInt32(
+						pool,
+						arrow.Field{Name: "f2-i32", Type: arrow.PrimitiveTypes.Int32},
+						[]int32{11, 22, 33, 44, 55, 1111},
+						nil,
+					),
+				}
+				for _, s := range ss {
+					defer s.Release()
+				}
+
+				return dataframe.NewFromSeries(pool, ss)
+			},
+			inSeriesName: "f1-i64",
+			inDataFrame2: func(pool memory.Allocator) dataframe.DataFrame {
+				ss := []series.Series{
+					series.FromInt64(
+						pool,
+						arrow.Field{Name: "f1-i64", Type: arrow.PrimitiveTypes.Int64},
+						[]int64{1, 2, 2, 5, 8, 9, 10},
+						nil,
+					),
+					series.FromInt32(
+						pool,
+						arrow.Field{Name: "f3-i32", Type: arrow.PrimitiveTypes.Int32},
+						[]int32{111, 222, 202020, 555, 888, 999, 101010},
+						nil,
+					),
+				}
+				for _, s := range ss {
+					defer s.Release()
+				}
+
+				return dataframe.NewFromSeries(pool, ss)
+			},
+			inSeriesName2: "f1-i64",
+			expNumCols:    3,
+			expNumRows:    7,
+			exp: []interface{}{
+				[]int64{1, 2, 2, 3, 4, 5, 11},
+				[]int32{11, 22, 22, 33, 44, 55, 1111},
+				[]int32{111, 222, 202020, 0, 0, 555, 0},
+			},
+			expNAIndices: [][]int{
+				[]int{},
+				[]int{},
+				[]int{3, 4, 6},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			act := tt.inDataFrame(pool)
+			defer act.Release()
+			act2 := tt.inDataFrame2(pool)
+			defer act2.Release()
+
+			actJoin := dataframe.RightJoin(act2, tt.inSeriesName2, act, tt.inSeriesName)
+			defer actJoin.Release()
+
+			numR, numC := actJoin.Dims()
+			require.Equal(t, tt.expNumCols, numC)
+			require.Equal(t, tt.expNumRows, numR)
+
+			for i := range tt.exp {
+				assert.Equal(t, tt.exp[i], actJoin.Series(i).Values())
+				assert.Equal(t, tt.expNAIndices[i], actJoin.Series(i).NAIndices())
+			}
+		})
+	}
+}
+
 func TestMax(t *testing.T) {
 	tests := []struct {
 		scenario string

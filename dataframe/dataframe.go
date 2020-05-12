@@ -568,7 +568,6 @@ func LeftJoin(leftDF DataFrame, leftName string, rightDF DataFrame, rightName st
 	}
 	midIndice := len(leftDF.series)
 	var j int
-	// rightSeriesIndices := make([]int, len(rightDF.series)-1)
 	for i, s := range rightDF.series {
 		// skip series used in join
 		if s.Name() == rightName {
@@ -655,6 +654,105 @@ func LeftJoin(leftDF DataFrame, leftName string, rightDF DataFrame, rightName st
 	defer rec.Release()
 
 	return NewFromRecords(leftDF.pool, []array.Record{rec})
+}
+
+// RightJoin ...
+func RightJoin(leftDF DataFrame, leftName string, rightDF DataFrame, rightName string) DataFrame {
+	// TODO(poopoothegorilla): add check for series name overlaps
+	fields := make([]arrow.Field, len(leftDF.series)+len(rightDF.series)-1)
+	fieldIndices := make([]int, 0, len(fields))
+	for i, s := range rightDF.series {
+		fields[i] = s.Field()
+		fieldIndices = append(fieldIndices, i)
+	}
+	midIndice := len(rightDF.series)
+	var j int
+	for i, s := range rightDF.series {
+		// skip series used in join
+		if s.Name() == rightName {
+			continue
+		}
+		fields[midIndice+j] = s.Field()
+		fieldIndices = append(fieldIndices, i)
+		j++
+	}
+	schema := arrow.NewSchema(fields, nil)
+	rb := array.NewRecordBuilder(leftDF.pool, schema)
+	defer rb.Release()
+
+	rightSeries := rightDF.SeriesByName(rightName)
+	for ri := 0; ri < rightSeries.Len(); ri++ {
+		rightVals := rightSeries.Values()
+		var leftIndices []int
+		switch rf := rightVals.(type) {
+		case []int32:
+			leftIndices = leftDF.SeriesByName(leftName).FindIndices(rf[ri])
+		case []int64:
+			leftIndices = leftDF.SeriesByName(leftName).FindIndices(rf[ri])
+		case []float32:
+			leftIndices = leftDF.SeriesByName(leftName).FindIndices(rf[ri])
+		case []float64:
+			leftIndices = leftDF.SeriesByName(leftName).FindIndices(rf[ri])
+		default:
+			panic("dataframe: right_join: unknown type")
+		}
+
+		var li int
+		for {
+			for fi, b := range rb.Fields() {
+				if fi < midIndice {
+					switch fb := b.(type) {
+					case *array.Int32Builder:
+						v := rightDF.Series(fieldIndices[fi]).Int32(ri)
+						fb.AppendValues([]int32{v}, nil)
+					case *array.Int64Builder:
+						v := rightDF.Series(fieldIndices[fi]).Int64(ri)
+						fb.AppendValues([]int64{v}, nil)
+					case *array.Float32Builder:
+						v := rightDF.Series(fieldIndices[fi]).Float32(ri)
+						fb.AppendValues([]float32{v}, nil)
+					case *array.Float64Builder:
+						v := rightDF.Series(fieldIndices[fi]).Float64(ri)
+						fb.AppendValues([]float64{v}, nil)
+					default:
+						panic("dataframe: right_join: unknown type")
+					}
+					continue
+				}
+				if len(leftIndices) > 0 {
+					leftIndice := leftIndices[li]
+					switch fb := b.(type) {
+					case *array.Int32Builder:
+						v := leftDF.Series(fieldIndices[fi]).Int32(leftIndice)
+						fb.AppendValues([]int32{v}, nil)
+					case *array.Int64Builder:
+						v := leftDF.Series(fieldIndices[fi]).Int64(leftIndice)
+						fb.AppendValues([]int64{v}, nil)
+					case *array.Float32Builder:
+						v := leftDF.Series(fieldIndices[fi]).Float32(leftIndice)
+						fb.AppendValues([]float32{v}, nil)
+					case *array.Float64Builder:
+						v := leftDF.Series(fieldIndices[fi]).Float64(leftIndice)
+						fb.AppendValues([]float64{v}, nil)
+					default:
+						panic("dataframe: right_join: unknown type")
+					}
+					continue
+				}
+
+				b.AppendNull()
+			}
+
+			li++
+			if li >= len(leftIndices) {
+				break
+			}
+		}
+	}
+	rec := rb.NewRecord()
+	defer rec.Release()
+
+	return NewFromRecords(rightDF.pool, []array.Record{rec})
 }
 
 // Max ...

@@ -63,8 +63,8 @@ TODO(poopoothegorilla): add short description of package
 - [ ] RenameColumn
 - [ ] FillNA
 - [ ] Replace
-- [ ] Left Join
-- [ ] Right Join
+- [x] Left Join
+- [x] Right Join
 - [ ] Inner Join
 - [ ] Cross Join
 - [ ] Outer Join
