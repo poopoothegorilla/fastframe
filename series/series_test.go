@@ -248,6 +248,88 @@ func TestNAIndices(t *testing.T) {
 	}
 }
 
+func TestIsNA(t *testing.T) {
+	tests := []struct {
+		scenario string
+
+		inField  arrow.Field
+		inColumn func(memory.Allocator) array.Interface
+
+		exp []bool
+	}{
+		{
+			scenario: "int32 column",
+			inField:  arrow.Field{Name: "f1-i32", Type: arrow.PrimitiveTypes.Int32},
+			inColumn: func(pool memory.Allocator) array.Interface {
+				b := array.NewInt32Builder(pool)
+				defer b.Release()
+
+				b.AppendValues([]int32{1, 2, 3, 4, 5, 6, 7},
+					[]bool{true, false, true, false, true, false, true})
+
+				return b.NewArray()
+			},
+			exp: []bool{false, true, false, true, false, true, false},
+		},
+		{
+			scenario: "int64 column",
+			inField:  arrow.Field{Name: "f1-i64", Type: arrow.PrimitiveTypes.Int64},
+			inColumn: func(pool memory.Allocator) array.Interface {
+				b := array.NewInt64Builder(pool)
+				defer b.Release()
+
+				b.AppendValues([]int64{1, 2, 3, 4, 5, 6, 7},
+					[]bool{true, false, true, false, true, false, true})
+
+				return b.NewArray()
+			},
+			exp: []bool{false, true, false, true, false, true, false},
+		},
+		{
+			scenario: "float32 column",
+			inField:  arrow.Field{Name: "f1-f32", Type: arrow.PrimitiveTypes.Float32},
+			inColumn: func(pool memory.Allocator) array.Interface {
+				b := array.NewFloat32Builder(pool)
+				defer b.Release()
+
+				b.AppendValues([]float32{1, 2, 3, 4, 5, 6, 7},
+					[]bool{true, false, true, false, true, false, true})
+
+				return b.NewArray()
+			},
+			exp: []bool{false, true, false, true, false, true, false},
+		},
+		{
+			scenario: "float64 column",
+			inField:  arrow.Field{Name: "f1-f64", Type: arrow.PrimitiveTypes.Float64},
+			inColumn: func(pool memory.Allocator) array.Interface {
+				b := array.NewFloat64Builder(pool)
+				defer b.Release()
+
+				b.AppendValues([]float64{1, 2, 3, 4, 5, 6, 7},
+					[]bool{true, false, true, false, true, false, true})
+
+				return b.NewArray()
+			},
+			exp: []bool{false, true, false, true, false, true, false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			actSeries := series.FromArrow(pool, tt.inField, tt.inColumn(pool))
+			require.NotNil(t, actSeries)
+			defer actSeries.Release()
+
+			act := actSeries.IsNA()
+			assert.Equal(t, tt.exp, act)
+		})
+	}
+}
+
 func TestDropIndices(t *testing.T) {
 	tests := []struct {
 		scenario string

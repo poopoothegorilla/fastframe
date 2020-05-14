@@ -363,7 +363,6 @@ func (s Series) FindIndices(val interface{}) []int {
 // TODO: NA vs NULL NAMING CONVENTION?
 func (s Series) NAIndices() []int {
 	s.Retain()
-	defer s.Release()
 
 	var j int
 	result := make([]int, s.NullN())
@@ -374,6 +373,20 @@ func (s Series) NAIndices() []int {
 		}
 	}
 
+	s.Release()
+	return result
+}
+
+// IsNA ...
+func (s Series) IsNA() []bool {
+	s.Retain()
+
+	result := make([]bool, s.Len())
+	for i := 0; i < s.Len(); i++ {
+		result[i] = s.IsNull(i)
+	}
+
+	s.Release()
 	return result
 }
 

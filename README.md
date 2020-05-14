@@ -122,7 +122,7 @@ TODO(poopoothegorilla): add short description of package
 - [x] Append(b Series) Series
 - [x] SortValues() Series
 - [x] Rename() Series
-- [x] SelectIndices() Series
+- [x] SelectIndices(indices []int) Series
 - [x] DropIndices(indices []int) Series
 - [x] Head(n int) Series
 - [x] DropNA() Series
@@ -141,6 +141,8 @@ TODO(poopoothegorilla): add short description of package
 - [x] Mean() float64
 - [x] Median() float64
 
+- [x] IsNA() []bool
+- [x] FindIndices(interface{}) []int
 - [x] NAIndices() []int
 
 - [x] Implement Gonum Mat Interface
