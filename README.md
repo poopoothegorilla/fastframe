@@ -63,8 +63,8 @@ TODO(poopoothegorilla): add short description of package
 - [ ] RenameColumn
 - [ ] FillNA
 - [ ] Replace
-- [x] Left Join
-- [x] Right Join
+- [x] LeftJoin(DataFrame, string, DataFrame, string) DataFrame
+- [x] RightJoin(DataFrame, string, DataFrame, string) DataFrame
 - [ ] Inner Join
 - [ ] Cross Join
 - [ ] Outer Join

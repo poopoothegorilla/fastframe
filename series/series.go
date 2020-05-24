@@ -1,6 +1,7 @@
 package series
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/apache/arrow/go/arrow"
@@ -27,6 +28,69 @@ func FromArrow(pool memory.Allocator, field arrow.Field, column array.Interface)
 		field:     field,
 		Interface: column,
 	}
+}
+
+// FromInterface ...
+func FromInterface(pool memory.Allocator, field arrow.Field, vals interface{}, valid []bool) Series {
+	switch vs := vals.(type) {
+	case []int32:
+		return FromInt32(pool, field, vs, valid)
+	case []int64:
+		return FromInt64(pool, field, vs, valid)
+	case []float32:
+		return FromFloat32(pool, field, vs, valid)
+	case []float64:
+		return FromFloat64(pool, field, vs, valid)
+	case []interface{}:
+		switch field.Type {
+		case arrow.PrimitiveTypes.Int32:
+			int32s := make([]int32, len(vs))
+			for i, v := range vs {
+				val, ok := v.(int32)
+				if !ok {
+					val = 0
+				}
+				int32s[i] = val
+			}
+			return FromInt32(pool, field, int32s, valid)
+		case arrow.PrimitiveTypes.Int64:
+			int64s := make([]int64, len(vs))
+			for i, v := range vs {
+				val, ok := v.(int64)
+				if !ok {
+					val = 0
+				}
+				int64s[i] = val
+			}
+			return FromInt64(pool, field, int64s, valid)
+		case arrow.PrimitiveTypes.Float32:
+			float32s := make([]float32, len(vs))
+			for i, v := range vs {
+				val, ok := v.(float32)
+				if !ok {
+					val = 0
+				}
+				float32s[i] = val
+			}
+			return FromFloat32(pool, field, float32s, valid)
+		case arrow.PrimitiveTypes.Float64:
+			float64s := make([]float64, len(vs))
+			for i, v := range vs {
+				val, ok := v.(float64)
+				if !ok {
+					val = 0
+				}
+				float64s[i] = val
+			}
+			return FromFloat64(pool, field, float64s, valid)
+		default:
+			panic(fmt.Sprintf("series: from_interface: unsupported type: %T", field.Type))
+		}
+	default:
+		panic(fmt.Sprintf("series: from_interface: unsupported type: %T", vs))
+	}
+
+	return Series{}
 }
 
 // FromInt32 ...

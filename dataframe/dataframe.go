@@ -18,6 +18,40 @@ type DataFrame struct {
 	series []series.Series
 }
 
+// Row ...
+type Row struct {
+	Vals []interface{}
+	// TODO(poopoothegorilla): use byte mask like series null mask
+	Valid []bool
+}
+
+// AppendRows ...
+func AppendRows(r1, r2 Row) Row {
+	return Row{
+		Vals:  append(r1.Vals, r2.Vals...),
+		Valid: append(r1.Valid, r2.Valid...),
+	}
+}
+
+// NewFromRows ...
+func NewFromRows(pool memory.Allocator, fields []arrow.Field, rows []Row) DataFrame {
+	ss := make([]series.Series, len(fields))
+	vals := make([]interface{}, len(rows))
+	valid := make([]bool, len(rows))
+	for fi, field := range fields {
+		for ri, row := range rows {
+			val := row.Vals[fi]
+			valid[ri] = row.Valid[fi]
+			vals[ri] = val
+		}
+		s := series.FromInterface(pool, field, vals, valid)
+		defer s.Release()
+		ss[fi] = s
+	}
+
+	return NewFromSeries(pool, ss)
+}
+
 // NewFromRecords ...
 // TODO(poopoothegorilla): optimizations are needed here
 func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
@@ -167,7 +201,7 @@ func (df DataFrame) T() mat.Matrix {
 	numRows, _ := df.Dims()
 	rows := make([]series.Series, numRows)
 	for i := 0; i < numRows; i++ {
-		rows[i] = df.Row(i)
+		rows[i] = df.RowToSeries(i)
 	}
 
 	return NewFromSeries(df.pool, rows)
@@ -316,14 +350,32 @@ func (df DataFrame) Head(n int) DataFrame {
 
 // Row ...
 // NOTE: THIS MIGHT NOT BE A GOODE API OR IDEA
-func (df DataFrame) Row(i int) series.Series {
+func (df DataFrame) Row(i int) Row {
+	df.Retain()
+
+	_, cs := df.Dims()
+	vals := make([]interface{}, cs)
+	valid := make([]bool, cs)
+	for j, s := range df.series {
+		vals[j] = s.Value(i)
+		valid[j] = !s.IsNull(i)
+	}
+
+	df.Release()
+	return Row{Vals: vals, Valid: valid}
+}
+
+// RowToSeries ...
+// TODO(poopoothegorilla): should use the Row type.
+// NOTE: THIS MIGHT NOT BE A GOODE API OR IDEA
+func (df DataFrame) RowToSeries(i int) series.Series {
 	df.Retain()
 	defer df.Release()
 
 	_, cs := df.Dims()
 	result := make([]float64, cs)
-	for j, col := range df.series {
-		result[j] = col.AtVec(i)
+	for j, s := range df.series {
+		result[j] = s.AtVec(i)
 	}
 	f := arrow.Field{Name: strconv.Itoa(i), Type: arrow.PrimitiveTypes.Float64}
 
@@ -556,6 +608,61 @@ func (df DataFrame) DropNARowsBySeriesIndices(seriesIndices []int) DataFrame {
 // func CrossJoin(df DataFrame, a string, df2 DataFrame, b string) DataFrame {
 //
 // }
+
+// LeftJoinEM ...
+// TODO(poopoothegorilla): use Early materialization and compare vs naive
+func LeftJoinEM(leftDF DataFrame, leftName string, rightDF DataFrame, rightName string) DataFrame {
+	var resultRows []Row
+
+	newRightDF := rightDF.DropColumnsByNames([]string{rightName})
+	defer newRightDF.Release()
+	newNColsR := int(newRightDF.NumCols())
+	newNColsL := int(leftDF.NumCols())
+	fields := make([]arrow.Field, 0, newNColsR+newNColsL)
+	for _, s := range leftDF.series {
+		fields = append(fields, s.Field())
+	}
+	for _, s := range newRightDF.series {
+		fields = append(fields, s.Field())
+	}
+
+	leftSeries := leftDF.SeriesByName(leftName)
+	rightSeries := rightDF.SeriesByName(rightName)
+	leftVals := leftSeries.Values()
+	for li := 0; li < leftSeries.Len(); li++ {
+		var rightIndices []int
+		switch lf := leftVals.(type) {
+		case []int32:
+			rightIndices = rightSeries.FindIndices(lf[li])
+		case []int64:
+			rightIndices = rightSeries.FindIndices(lf[li])
+		case []float32:
+			rightIndices = rightSeries.FindIndices(lf[li])
+		case []float64:
+			rightIndices = rightSeries.FindIndices(lf[li])
+		default:
+			panic("dataframe: left_join: unknown type")
+		}
+
+		if len(rightIndices) <= 0 {
+			emptyRow := Row{
+				Vals:  make([]interface{}, newNColsR),
+				Valid: make([]bool, newNColsR),
+			}
+			row := AppendRows(leftDF.Row(li), emptyRow)
+			resultRows = append(resultRows, row)
+			continue
+		}
+
+		for _, j := range rightIndices {
+			rightRow := newRightDF.Row(j)
+			row := AppendRows(leftDF.Row(li), rightRow)
+			resultRows = append(resultRows, row)
+		}
+	}
+
+	return NewFromRows(leftDF.pool, fields, resultRows)
+}
 
 // LeftJoin ...
 func LeftJoin(leftDF DataFrame, leftName string, rightDF DataFrame, rightName string) DataFrame {
