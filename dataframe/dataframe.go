@@ -16,40 +16,7 @@ import (
 type DataFrame struct {
 	pool   memory.Allocator
 	series []series.Series
-}
-
-// Row ...
-type Row struct {
-	Vals []interface{}
-	// TODO(poopoothegorilla): use byte mask like series null mask
-	Valid []bool
-}
-
-// AppendRows ...
-func AppendRows(r1, r2 Row) Row {
-	return Row{
-		Vals:  append(r1.Vals, r2.Vals...),
-		Valid: append(r1.Valid, r2.Valid...),
-	}
-}
-
-// NewFromRows ...
-func NewFromRows(pool memory.Allocator, fields []arrow.Field, rows []Row) DataFrame {
-	ss := make([]series.Series, len(fields))
-	vals := make([]interface{}, len(rows))
-	valid := make([]bool, len(rows))
-	for fi, field := range fields {
-		for ri, row := range rows {
-			val := row.Vals[fi]
-			valid[ri] = row.Valid[fi]
-			vals[ri] = val
-		}
-		s := series.FromInterface(pool, field, vals, valid)
-		defer s.Release()
-		ss[fi] = s
-	}
-
-	return NewFromSeries(pool, ss)
+	schema *arrow.Schema
 }
 
 // NewFromRecords ...
@@ -223,14 +190,22 @@ func (df DataFrame) Dims() (r, c int) {
 // NOTE: for arrow Table interface
 //////////////
 
-// Schema ...
-func (df DataFrame) Schema() *arrow.Schema {
+func (df DataFrame) newSchema() *arrow.Schema {
 	fields := make([]arrow.Field, len(df.series))
 	for i, col := range df.series {
 		fields[i] = col.Field()
 	}
 
 	return arrow.NewSchema(fields, nil)
+}
+
+// Schema ...
+func (df DataFrame) Schema() *arrow.Schema {
+	if df.schema == nil {
+		df.schema = df.newSchema()
+	}
+
+	return df.schema
 }
 
 // NumRows ...
@@ -348,22 +323,75 @@ func (df DataFrame) Head(n int) DataFrame {
 	return NewFromSeries(df.pool, ss)
 }
 
-// Row ...
-// NOTE: THIS MIGHT NOT BE A GOODE API OR IDEA
-func (df DataFrame) Row(i int) Row {
+// Record ...
+func (df DataFrame) Record(i int) array.Record {
 	df.Retain()
 
 	_, cs := df.Dims()
-	vals := make([]interface{}, cs)
-	valid := make([]bool, cs)
+	cols := make([]array.Interface, cs)
 	for j, s := range df.series {
-		vals[j] = s.Value(i)
-		valid[j] = !s.IsNull(i)
+		slice := array.NewSlice(s, int64(i), int64(i+1))
+		defer slice.Release()
+		cols[j] = slice
 	}
 
 	df.Release()
-	return Row{Vals: vals, Valid: valid}
+	return array.NewRecord(df.Schema(), cols, -1)
 }
+
+// EmptyRecord ...
+func (df DataFrame) EmptyRecord(n int) array.Record {
+	df.Retain()
+
+	cols := make([]array.Interface, int(df.NumCols()))
+	for i, s := range df.series {
+		empty := s.Empty(n)
+		cols[i] = empty
+		defer empty.Release()
+	}
+
+	df.Release()
+	return array.NewRecord(df.Schema(), cols, -1)
+}
+
+// MergeRecords ...
+// TODO(poopoothegorilla) finish
+func MergeRecords(records ...array.Record) array.Record {
+	var numCols int64
+	for _, record := range records {
+		record.Retain()
+		defer record.Release()
+		numCols += record.NumCols()
+	}
+
+	fields := make([]arrow.Field, 0, int(numCols))
+	cols := make([]array.Interface, 0, int(numCols))
+	for _, record := range records {
+		fields = append(fields, record.Schema().Fields()...)
+		cols = append(cols, record.Columns()...)
+	}
+
+	schema := arrow.NewSchema(fields, nil)
+
+	return array.NewRecord(schema, cols, -1)
+}
+
+// Row ...
+// NOTE: THIS MIGHT NOT BE A GOODE API OR IDEA
+// func (df DataFrame) Row(i int) Row {
+// 	df.Retain()
+//
+// 	_, cs := df.Dims()
+// 	vals := make([]interface{}, cs)
+// 	valid := make([]bool, cs)
+// 	for j, s := range df.series {
+// 		vals[j] = s.Value(i)
+// 		valid[j] = !s.IsNull(i)
+// 	}
+//
+// 	df.Release()
+// 	return Row{Vals: vals, Valid: valid}
+// }
 
 // RowToSeries ...
 // TODO(poopoothegorilla): should use the Row type.
@@ -612,7 +640,7 @@ func (df DataFrame) DropNARowsBySeriesIndices(seriesIndices []int) DataFrame {
 // LeftJoinEM ...
 // TODO(poopoothegorilla): use Early materialization and compare vs naive
 func LeftJoinEM(leftDF DataFrame, leftName string, rightDF DataFrame, rightName string) DataFrame {
-	var resultRows []Row
+	var resultRecords []array.Record
 
 	newRightDF := rightDF.DropColumnsByNames([]string{rightName})
 	defer newRightDF.Release()
@@ -625,6 +653,10 @@ func LeftJoinEM(leftDF DataFrame, leftName string, rightDF DataFrame, rightName 
 	for _, s := range newRightDF.series {
 		fields = append(fields, s.Field())
 	}
+
+	schema := arrow.NewSchema(fields, nil)
+	rb := array.NewRecordBuilder(leftDF.pool, schema)
+	defer rb.Release()
 
 	leftSeries := leftDF.SeriesByName(leftName)
 	rightSeries := rightDF.SeriesByName(rightName)
@@ -644,24 +676,45 @@ func LeftJoinEM(leftDF DataFrame, leftName string, rightDF DataFrame, rightName 
 			panic("dataframe: left_join: unknown type")
 		}
 
+		// if len(rightIndices) <= 0 {
+		// 	emptyRow := Row{
+		// 		Vals:  make([]interface{}, newNColsR),
+		// 		Valid: make([]bool, newNColsR),
+		// 	}
+		// 	row := AppendRows(leftDF.Row(li), emptyRow)
+		// 	resultRows = append(resultRows, row)
+		// 	continue
+		// }
 		if len(rightIndices) <= 0 {
-			emptyRow := Row{
-				Vals:  make([]interface{}, newNColsR),
-				Valid: make([]bool, newNColsR),
-			}
-			row := AppendRows(leftDF.Row(li), emptyRow)
-			resultRows = append(resultRows, row)
+			emptyRecord := newRightDF.EmptyRecord(1)
+			defer emptyRecord.Release()
+			leftRecord := leftDF.Record(li)
+			defer leftRecord.Release()
+
+			record := MergeRecords(leftRecord, emptyRecord)
+			defer record.Release()
+			resultRecords = append(resultRecords, record)
 			continue
 		}
 
+		// for _, j := range rightIndices {
+		// 	rightRow := newRightDF.Row(j)
+		// 	row := AppendRows(leftDF.Row(li), rightRow)
+		// 	resultRows = append(resultRows, row)
+		// }
 		for _, j := range rightIndices {
-			rightRow := newRightDF.Row(j)
-			row := AppendRows(leftDF.Row(li), rightRow)
-			resultRows = append(resultRows, row)
+			rightRecord := newRightDF.Record(j)
+			defer rightRecord.Release()
+			leftRecord := leftDF.Record(li)
+			defer leftRecord.Release()
+
+			record := MergeRecords(leftRecord, rightRecord)
+			defer record.Release()
+			resultRecords = append(resultRecords, record)
 		}
 	}
 
-	return NewFromRows(leftDF.pool, fields, resultRows)
+	return NewFromRecords(leftDF.pool, resultRecords)
 }
 
 // LeftJoin ...

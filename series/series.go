@@ -149,6 +149,45 @@ func FromFloat64(pool memory.Allocator, field arrow.Field, vals []float64, valid
 	}
 }
 
+// Empty ...
+func (s Series) Empty(n int) Series {
+	s.Retain()
+
+	valid := make([]bool, n)
+	var col array.Interface
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+		vals := make([]int32, n)
+		b := array.NewInt32Builder(s.pool)
+		defer b.Release()
+		b.AppendValues(vals, valid)
+		col = b.NewArray()
+	case arrow.PrimitiveTypes.Int64:
+		vals := make([]int64, n)
+		b := array.NewInt64Builder(s.pool)
+		defer b.Release()
+		b.AppendValues(vals, valid)
+		col = b.NewArray()
+	case arrow.PrimitiveTypes.Float32:
+		vals := make([]float32, n)
+		b := array.NewFloat32Builder(s.pool)
+		defer b.Release()
+		b.AppendValues(vals, valid)
+		col = b.NewArray()
+	case arrow.PrimitiveTypes.Float64:
+		vals := make([]float64, n)
+		b := array.NewFloat64Builder(s.pool)
+		defer b.Release()
+		b.AppendValues(vals, valid)
+		col = b.NewArray()
+	default:
+		panic("series.Empty: unknown type")
+	}
+
+	s.Release()
+	return FromArrow(s.pool, s.field, col)
+}
+
 // Column ...
 func (s Series) Column() *array.Column {
 	s.Retain()
@@ -175,7 +214,7 @@ func (s Series) Value(i int) interface{} {
 	case arrow.PrimitiveTypes.Float64:
 		v = s.Interface.(*array.Float64).Value(i)
 	default:
-		panic("series: unknown type")
+		panic("series.Value: unknown type")
 	}
 
 	s.Release()
@@ -197,7 +236,7 @@ func (s Series) Int32(i int) int32 {
 	case arrow.PrimitiveTypes.Float64:
 		v = int32(s.Interface.(*array.Float64).Value(i))
 	default:
-		panic("series: unknown type")
+		panic("series.Int32: unknown type")
 	}
 
 	s.Release()

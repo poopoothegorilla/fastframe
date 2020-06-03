@@ -17,41 +17,6 @@ import (
 	"github.com/ptiger10/tada"
 )
 
-func BenchmarkNewFromInterfaces(b *testing.B) {
-	colVals := []int{10, 100, 1000}
-	rowVals := []int{2}
-
-	for _, colVal := range colVals {
-		for _, rowVal := range rowVals {
-			b.Run(fmt.Sprintf("size=%vcolsx%vrows", colVal, rowVal), func(b *testing.B) {
-				benchmarkNewFromInterfaces(b, colVal, rowVal)
-			})
-		}
-	}
-}
-
-func benchmarkNewFromInterfaces(b *testing.B, cols, nrows int) {
-	pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
-	defer pool.AssertSize(b, 0)
-	t := arrow.PrimitiveTypes.Float32
-
-	fields := make([]arrow.Field, cols)
-	for i := 0; i < cols; i++ {
-		name := strconv.Itoa(i)
-		fields[i] = arrow.Field{Name: name, Type: t}
-	}
-	rows := make([]dataframe.Row, nrows)
-	for i := 0; i < nrows; i++ {
-		rows[i] = newDataframeRow(fields)
-	}
-
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		df := dataframe.NewFromRows(pool, fields, rows)
-		df.Release()
-	}
-}
-
 func BenchmarkNewFromRecords(b *testing.B) {
 	colVals := []int{10, 100, 1000}
 	rowVals := []int{2}
@@ -764,29 +729,4 @@ func newArrowRecord(pool memory.Allocator, numVals int, fields []arrow.Field) ar
 	}
 
 	return rb.NewRecord()
-}
-
-func newDataframeRow(fields []arrow.Field) dataframe.Row {
-	vals := make([]interface{}, len(fields))
-	valid := make([]bool, len(fields))
-
-	for i, fb := range fields {
-		switch fb.Type {
-		case arrow.PrimitiveTypes.Int32:
-			vals[i] = rand.Int31()
-		case arrow.PrimitiveTypes.Int64:
-			vals[i] = rand.Int63()
-		case arrow.PrimitiveTypes.Float32:
-			vals[i] = rand.Float32()
-		case arrow.PrimitiveTypes.Float64:
-			vals[i] = rand.Float64()
-		default:
-			panic("unknown type")
-		}
-	}
-
-	return dataframe.Row{
-		Vals:  vals,
-		Valid: valid,
-	}
 }
