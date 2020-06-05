@@ -676,15 +676,6 @@ func LeftJoinEM(leftDF DataFrame, leftName string, rightDF DataFrame, rightName 
 			panic("dataframe: left_join: unknown type")
 		}
 
-		// if len(rightIndices) <= 0 {
-		// 	emptyRow := Row{
-		// 		Vals:  make([]interface{}, newNColsR),
-		// 		Valid: make([]bool, newNColsR),
-		// 	}
-		// 	row := AppendRows(leftDF.Row(li), emptyRow)
-		// 	resultRows = append(resultRows, row)
-		// 	continue
-		// }
 		if len(rightIndices) <= 0 {
 			emptyRecord := newRightDF.EmptyRecord(1)
 			defer emptyRecord.Release()
@@ -697,11 +688,6 @@ func LeftJoinEM(leftDF DataFrame, leftName string, rightDF DataFrame, rightName 
 			continue
 		}
 
-		// for _, j := range rightIndices {
-		// 	rightRow := newRightDF.Row(j)
-		// 	row := AppendRows(leftDF.Row(li), rightRow)
-		// 	resultRows = append(resultRows, row)
-		// }
 		for _, j := range rightIndices {
 			rightRecord := newRightDF.Record(j)
 			defer rightRecord.Release()
