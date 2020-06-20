@@ -1,7 +1,9 @@
 package dataframe_test
 
 import (
+	"encoding/csv"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/apache/arrow/go/arrow"
@@ -185,6 +187,57 @@ func TestNewFromSeries(t *testing.T) {
 			}
 
 			act := dataframe.NewFromSeries(pool, inSeries)
+			defer act.Release()
+
+			numR, numC := act.Dims()
+			require.Equal(t, tt.expNumCols, numC)
+			require.Equal(t, tt.expNumRows, numR)
+
+			for i := range tt.exp {
+				assert.Equal(t, tt.exp[i], act.Series(i).Values())
+			}
+		})
+	}
+}
+
+func TestNewFromCSV(t *testing.T) {
+	tests := []struct {
+		scenario string
+
+		inCSV string
+
+		expNumCols int
+		expNumRows int
+		exp        []interface{}
+	}{
+		{
+			// TODO: CHANGE THE FIELDS TO BE ALL TYPES
+			scenario: "valid",
+			inCSV: `"f1-f64","f2-f64","f3-f64","f4-f64"
+1,11,111,1111
+2,22,222,2222
+3,33,333,3333
+4,44,444,4444
+5,55,555,5555`,
+			expNumCols: 4,
+			expNumRows: 5,
+			exp: []interface{}{
+				[]float64{1, 2, 3, 4, 5},
+				[]float64{11, 22, 33, 44, 55},
+				[]float64{111, 222, 333, 444, 555},
+				[]float64{1111, 2222, 3333, 4444, 5555},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			inCSVReader := csv.NewReader(strings.NewReader(tt.inCSV))
+
+			act := dataframe.NewFromCSV(pool, inCSVReader, -1)
 			defer act.Release()
 
 			numR, numC := act.Dims()

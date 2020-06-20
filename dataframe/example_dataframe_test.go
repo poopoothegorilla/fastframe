@@ -72,6 +72,7 @@ func Example() {
 
 	// TODO(poopoothegorilla): the column output format is not the same if
 	// chunksize is larger than total rows.
+	fmt.Println("USERS:")
 	table := array.NewTableReader(usersDF, 2)
 	n := 0
 	for table.Next() {
@@ -81,12 +82,43 @@ func Example() {
 		}
 		n++
 	}
+	table.Release()
+
+	movieRatingsDF := generateMovieRatingsDF(pool)
+	defer movieRatingsDF.Release()
+
+	// TODO(poopoothegorilla): the column output format is not the same if
+	// chunksize is larger than total rows.
+	fmt.Println("MOVIE RATINGS:")
+	table = array.NewTableReader(movieRatingsDF, 2)
+	n = 0
+	for table.Next() {
+		rec := table.Record()
+		for i, col := range rec.Columns() {
+			fmt.Printf("rec[%d][%q]: %v\n", n, rec.ColumnName(i), col)
+		}
+		n++
+	}
+	table.Release()
+
+	// CREATE pivot table
 
 	// Output:
+	// USERS:
 	// rec[0]["id"]: [1000 21407]
 	// rec[0]["age"]: [20 16]
 	// rec[1]["id"]: [898989 8888]
 	// rec[1]["age"]: [35 66]
 	// rec[2]["id"]: [101292]
 	// rec[2]["age"]: [50]
+	// MOVIE RATINGS:
+	// rec[0]["user_id"]: [1000 21407]
+	// rec[0]["movie_id"]: [1000 21407]
+	// rec[0]["rating"]: [20 16]
+	// rec[1]["user_id"]: [898989 8888]
+	// rec[1]["movie_id"]: [898989 8888]
+	// rec[1]["rating"]: [35 66]
+	// rec[2]["user_id"]: [101292]
+	// rec[2]["movie_id"]: [101292]
+	// rec[2]["rating"]: [50]
 }

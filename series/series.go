@@ -3,6 +3,7 @@ package series
 import (
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
@@ -149,7 +150,7 @@ func FromFloat64(pool memory.Allocator, field arrow.Field, vals []float64, valid
 	}
 }
 
-// Empty ...
+// Empty creates an empty Series with n elements.
 func (s Series) Empty(n int) Series {
 	s.Retain()
 
@@ -326,6 +327,39 @@ func (s Series) Values() interface{} {
 	default:
 		panic("series: unknown type")
 	}
+}
+
+// StringValues ...
+func (s Series) StringValues() []string {
+	s.Retain()
+	defer s.Release()
+
+	var res []string
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+		vs := s.Interface.(*array.Int32).Int32Values()
+		for _, v := range vs {
+			res = append(res, strconv.FormatInt(int64(v), 10))
+		}
+	case arrow.PrimitiveTypes.Int64:
+		vs := s.Interface.(*array.Int64).Int64Values()
+		for _, v := range vs {
+			res = append(res, strconv.FormatInt(v, 10))
+		}
+	case arrow.PrimitiveTypes.Float32:
+		vs := s.Interface.(*array.Float32).Float32Values()
+		for _, v := range vs {
+			res = append(res, strconv.FormatFloat(float64(v), 'f', -1, 32))
+		}
+	case arrow.PrimitiveTypes.Float64:
+		vs := s.Interface.(*array.Float64).Float64Values()
+		for _, v := range vs {
+			res = append(res, strconv.FormatFloat(v, 'f', -1, 64))
+		}
+	default:
+		panic("series: unknown type")
+	}
+	return res
 }
 
 // Field ...

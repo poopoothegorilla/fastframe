@@ -1,6 +1,9 @@
 package dataframe
 
 import (
+	"encoding/csv"
+	"fmt"
+	"io"
 	"sort"
 	"strconv"
 
@@ -17,6 +20,7 @@ type DataFrame struct {
 	pool   memory.Allocator
 	series []series.Series
 	schema *arrow.Schema
+	reader io.Reader
 }
 
 // NewFromRecords ...
@@ -145,6 +149,47 @@ func NewFromSeries(pool memory.Allocator, series []series.Series) DataFrame {
 	return DataFrame{
 		pool:   pool,
 		series: series,
+	}
+}
+
+// NewFromCSV ...
+func NewFromCSV(pool memory.Allocator, r *csv.Reader, batchSize int) DataFrame {
+	// TODO(poopoothegorilla): add batching
+	rows, err := r.ReadAll()
+	if err != nil {
+		panic(fmt.Sprintf("dataframe: new_from_csv: %s", err))
+	}
+	// TODO(poopoothegorilla): what about csvs without headers
+	headers := rows[0]
+	ss := make([]series.Series, len(headers))
+	b := array.NewFloat64Builder(pool)
+	defer b.Release()
+	for i, h := range headers {
+		field := arrow.Field{
+			Name:     h,
+			Type:     arrow.PrimitiveTypes.Float64,
+			Nullable: true,
+		}
+		vals := make([]float64, len(rows)-1)
+		for j, row := range rows {
+			if j == 0 {
+				continue
+			}
+			val, err := strconv.ParseFloat(string(row[i]), 64)
+			if err != nil {
+				panic(fmt.Sprintf("dataframe: new_from_csv: %s", err))
+			}
+			vals[j-1] = val
+		}
+		b.AppendValues(vals, nil)
+
+		s := series.FromArrow(pool, field, b.NewArray())
+		ss[i] = s
+	}
+
+	return DataFrame{
+		pool:   pool,
+		series: ss,
 	}
 }
 
@@ -1075,4 +1120,30 @@ func (df DataFrame) Dot(rowi, rowj int) float64 {
 	}
 
 	return res
+}
+
+// Pivot ...
+// TODO(poopoothegorilla): finish
+func (df DataFrame) Pivot(idx, cols, vals string) DataFrame {
+	// df.Retain()
+	// defer df.Release()
+	// // reduce to unique values of idx and create series
+	// // get unique values of cols which will be col names
+	// // vals will be values for each cols
+	// idxSeries := df.SeriesByName(idx).Unique()
+	// colsSeries := df.SeriesByName(cols).Unique()
+	// colNames := colsSeries.StringValues()
+	// ss := make([]Series, len(colNames)+1)
+	// ss[0] = idxSeries
+	// for i, colName := range colNames {
+	// 	// vals = df.Where(
+	// 	//   func(record, []values) {
+	// 	//     record.ColName == colName and record.MovieID == movieid
+	// 	//     return bool
+	// 	//   }
+	// 	// )
+	// 	ss[i+1] = series.F
+	// }
+	//
+	return df
 }
