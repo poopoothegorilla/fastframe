@@ -461,6 +461,14 @@ func (s Series) FindIndices(val interface{}) []int {
 	var result []int
 	switch vals := s.Values().(type) {
 	case []int32:
+		switch v := val.(type) {
+		case string:
+			b, err := strconv.ParseInt(v, 10, 32)
+			if err != nil {
+				panic(fmt.Sprintf("series: find_indices:", err))
+			}
+			val = int32(b)
+		}
 		for i, v := range vals {
 			if v != val || s.IsNull(i) {
 				continue

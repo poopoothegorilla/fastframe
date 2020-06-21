@@ -1,7 +1,9 @@
 package dataframe_test
 
 import (
+	"encoding/csv"
 	"fmt"
+	"strings"
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
@@ -9,29 +11,40 @@ import (
 	"github.com/poopoothegorilla/fastframe/dataframe"
 )
 
+// func generateUsersDF(pool memory.Allocator) dataframe.DataFrame {
+// 	schema := arrow.NewSchema([]arrow.Field{
+// 		arrow.Field{Name: "id", Type: arrow.PrimitiveTypes.Int64},
+// 		arrow.Field{Name: "age", Type: arrow.PrimitiveTypes.Int32},
+// 	}, nil)
+//
+// 	bi64 := array.NewInt64Builder(pool)
+// 	defer bi64.Release()
+// 	bi32 := array.NewInt32Builder(pool)
+// 	defer bi32.Release()
+//
+// 	bi64.AppendValues([]int64{1000, 21407, 898989, 8888, 101292}, nil)
+// 	ids := bi64.NewArray()
+// 	defer ids.Release()
+//
+// 	bi32.AppendValues([]int32{20, 16, 35, 66, 50}, nil)
+// 	ages := bi32.NewArray()
+// 	defer ages.Release()
+//
+// 	cols := []array.Interface{ids, ages}
+// 	users := []array.Record{array.NewRecord(schema, cols, -1)}
+//
+// 	return dataframe.NewFromRecords(pool, users)
+// }
+
 func generateUsersDF(pool memory.Allocator) dataframe.DataFrame {
-	schema := arrow.NewSchema([]arrow.Field{
-		arrow.Field{Name: "id", Type: arrow.PrimitiveTypes.Int64},
-		arrow.Field{Name: "age", Type: arrow.PrimitiveTypes.Int32},
-	}, nil)
+	r := csv.NewReader(strings.NewReader(`"id","age"
+1000,20
+21407,16
+898989,35
+8888,66
+101292,50`))
 
-	bi64 := array.NewInt64Builder(pool)
-	defer bi64.Release()
-	bi32 := array.NewInt32Builder(pool)
-	defer bi32.Release()
-
-	bi64.AppendValues([]int64{1000, 21407, 898989, 8888, 101292}, nil)
-	ids := bi64.NewArray()
-	defer ids.Release()
-
-	bi32.AppendValues([]int32{20, 16, 35, 66, 50}, nil)
-	ages := bi32.NewArray()
-	defer ages.Release()
-
-	cols := []array.Interface{ids, ages}
-	users := []array.Record{array.NewRecord(schema, cols, -1)}
-
-	return dataframe.NewFromRecords(pool, users)
+	return dataframe.NewFromCSV(pool, r, -1)
 }
 
 func generateMovieRatingsDF(pool memory.Allocator) dataframe.DataFrame {

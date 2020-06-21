@@ -1738,3 +1738,99 @@ func TestDot(t *testing.T) {
 		})
 	}
 }
+
+func TestPivot(t *testing.T) {
+	tests := []struct {
+		scenario string
+
+		inDataFrame func(memory.Allocator) dataframe.DataFrame
+		inIdxName   string
+		inColsName  string
+		inValsName  string
+
+		expNumCols   int
+		expNumRows   int
+		exp          []interface{}
+		expNAIndices [][]int
+		expHeaders   []string
+	}{
+		{
+			scenario: "pivot dataframe",
+			inDataFrame: func(pool memory.Allocator) dataframe.DataFrame {
+				ss := []series.Series{
+					series.FromInt64(
+						pool,
+						arrow.Field{Name: "idx", Type: arrow.PrimitiveTypes.Int64},
+						[]int64{1, 2, 3, 4, 5, 6},
+						nil,
+					),
+					series.FromInt32(
+						pool,
+						arrow.Field{Name: "cols", Type: arrow.PrimitiveTypes.Int32},
+						[]int32{100, 200, 300, 400, 500, 600},
+						nil,
+					),
+					series.FromInt32(
+						pool,
+						arrow.Field{Name: "vals", Type: arrow.PrimitiveTypes.Int32},
+						[]int32{11, 22, 33, 44, 55, 1111},
+						nil,
+					),
+				}
+				for _, s := range ss {
+					defer s.Release()
+				}
+
+				return dataframe.NewFromSeries(pool, ss)
+			},
+			inIdxName:  "idx",
+			inColsName: "cols",
+			inValsName: "vals",
+			expNumCols: 7,
+			expNumRows: 6,
+			exp: []interface{}{
+				[]int64{1, 2, 3, 4, 5, 6},
+				[]int32{11, 0, 0, 0, 0, 0},
+				[]int32{0, 22, 0, 0, 0, 0},
+				[]int32{0, 0, 33, 0, 0, 0},
+				[]int32{0, 0, 0, 44, 0, 0},
+				[]int32{0, 0, 0, 0, 55, 0},
+				[]int32{0, 0, 0, 0, 0, 1111},
+			},
+			expNAIndices: [][]int{
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+			},
+			expHeaders: []string{"idx", "100", "200", "300", "400", "500", "600"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			act := tt.inDataFrame(pool)
+			defer act.Release()
+
+			actPivot := act.Pivot(tt.inIdxName, tt.inColsName, tt.inValsName)
+			defer actPivot.Release()
+
+			numR, numC := actPivot.Dims()
+			require.Equal(t, tt.expNumCols, numC)
+			require.Equal(t, tt.expNumRows, numR)
+
+			for i := range tt.exp {
+				assert.Equal(t, tt.exp[i], actPivot.Series(i).Values())
+				assert.Equal(t, tt.expNAIndices[i], actPivot.Series(i).NAIndices())
+			}
+			actHeaders := actPivot.Headers()
+			assert.Equal(t, tt.expHeaders, actHeaders)
+		})
+	}
+}

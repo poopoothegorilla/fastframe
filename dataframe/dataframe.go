@@ -318,7 +318,7 @@ func (df DataFrame) SeriesByName(name string) series.Series {
 		}
 	}
 
-	panic("dataframe: series_by_name: no series contain name")
+	panic(fmt.Sprintf("dataframe: series_by_name: no series contain name %q", name))
 	return series.Series{}
 }
 
@@ -1064,6 +1064,7 @@ func (df DataFrame) Subtract(df2 DataFrame) DataFrame {
 
 // Map ...
 // Where ...
+
 // Headers ...
 func (df DataFrame) Headers() []string {
 	df.Retain()
@@ -1123,27 +1124,56 @@ func (df DataFrame) Dot(rowi, rowj int) float64 {
 }
 
 // Pivot ...
-// TODO(poopoothegorilla): finish
 func (df DataFrame) Pivot(idx, cols, vals string) DataFrame {
-	// df.Retain()
-	// defer df.Release()
-	// // reduce to unique values of idx and create series
-	// // get unique values of cols which will be col names
-	// // vals will be values for each cols
-	// idxSeries := df.SeriesByName(idx).Unique()
-	// colsSeries := df.SeriesByName(cols).Unique()
-	// colNames := colsSeries.StringValues()
-	// ss := make([]Series, len(colNames)+1)
-	// ss[0] = idxSeries
-	// for i, colName := range colNames {
-	// 	// vals = df.Where(
-	// 	//   func(record, []values) {
-	// 	//     record.ColName == colName and record.MovieID == movieid
-	// 	//     return bool
-	// 	//   }
-	// 	// )
-	// 	ss[i+1] = series.F
-	// }
-	//
-	return df
+	df.Retain()
+	defer df.Release()
+
+	idxSeries := df.SeriesByName(idx)
+	uniqueIdxSeries := idxSeries.Unique()
+	colsSeries := df.SeriesByName(cols)
+	uniqueColsSeries := colsSeries.Unique()
+	defer uniqueColsSeries.Release()
+	valsSeries := df.SeriesByName(vals)
+	valsSeriesType := valsSeries.DataType()
+
+	colNames := uniqueColsSeries.StringValues()
+	ss := make([]series.Series, len(colNames)+1)
+	ss[0] = uniqueIdxSeries
+	for i, colName := range colNames {
+		field := arrow.Field{
+			Name:     colName,
+			Type:     valsSeriesType,
+			Nullable: true,
+		}
+		// Find Indices where colname exists in cols series
+		is := colsSeries.FindIndices(colName)
+		idxVals := make([]interface{}, len(is))
+		valVals := make([]interface{}, len(is))
+		for ii, j := range is {
+			// Find idx values at prev Indices
+			idxVals[ii] = idxSeries.Value(j)
+			// Find val values at prev Indices
+			valVals[ii] = valsSeries.Value(j)
+		}
+		data := make([]interface{}, uniqueIdxSeries.Len())
+		// Find Indices where idx values exist in idx series
+		for ii, v := range idxVals {
+			j := uniqueIdxSeries.FindIndices(v)
+			if len(j) > 1 {
+				panic("dataframe: pivot: index column is not unique")
+			}
+			if len(j) <= 0 || j == nil {
+				panic("dataframe: pivot: value not found in index")
+			}
+			// Set value to proper location
+			data[j[0]] = valVals[ii]
+		}
+
+		ss[i+1] = series.FromInterface(df.pool, field, data, nil)
+	}
+
+	return DataFrame{
+		pool:   df.pool,
+		series: ss,
+	}
 }
