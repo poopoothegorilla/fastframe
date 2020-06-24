@@ -3,12 +3,14 @@ package dataframe_test
 import (
 	"encoding/csv"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
 	"github.com/poopoothegorilla/fastframe/dataframe"
+	"github.com/poopoothegorilla/fastframe/series"
 )
 
 // func generateUsersDF(pool memory.Allocator) dataframe.DataFrame {
@@ -51,12 +53,12 @@ func generateMovieRatingsDF(pool memory.Allocator) dataframe.DataFrame {
 	schema := arrow.NewSchema([]arrow.Field{
 		arrow.Field{Name: "user_id", Type: arrow.PrimitiveTypes.Int64},
 		arrow.Field{Name: "movie_id", Type: arrow.PrimitiveTypes.Int64},
-		arrow.Field{Name: "rating", Type: arrow.PrimitiveTypes.Int32},
+		arrow.Field{Name: "rating", Type: arrow.PrimitiveTypes.Float32},
 	}, nil)
 
 	bi64 := array.NewInt64Builder(pool)
 	defer bi64.Release()
-	bi32 := array.NewInt32Builder(pool)
+	bi32 := array.NewFloat32Builder(pool)
 	defer bi32.Release()
 
 	bi64.AppendValues([]int64{1000, 21407, 898989, 8888, 101292}, nil)
@@ -67,7 +69,7 @@ func generateMovieRatingsDF(pool memory.Allocator) dataframe.DataFrame {
 	movieIDs := bi64.NewArray()
 	defer movieIDs.Release()
 
-	bi32.AppendValues([]int32{20, 16, 35, 66, 50}, nil)
+	bi32.AppendValues([]float32{0.2, 0.16, 0.35, 0.66, 0.50}, nil)
 	ratings := bi32.NewArray()
 	defer ratings.Release()
 
@@ -115,6 +117,46 @@ func Example() {
 	table.Release()
 
 	// CREATE pivot table
+	pivot := movieRatingsDF.Pivot("user_id", "movie_id", "rating")
+	fmt.Println("PIVOT:")
+	table = array.NewTableReader(pivot, 2)
+	n = 0
+	for table.Next() {
+		rec := table.Record()
+		for i, col := range rec.Columns() {
+			fmt.Printf("rec[%d][%q]: %v\n", n, rec.ColumnName(i), col)
+		}
+		n++
+	}
+	table.Release()
+
+	nr := int(pivot.NumRows())
+	ss := make([]series.Series, nr)
+	for i := 0; i < nr; i++ {
+		field := arrow.Field{
+			Name:     strconv.Itoa(i),
+			Type:     arrow.PrimitiveTypes.Float64,
+			Nullable: true,
+		}
+		vals := make([]float64, nr)
+		for j := 0; j < nr; j++ {
+			vals[j] = pivot.Dot(i, j)
+		}
+		ss[i] = series.FromFloat64(pool, field, vals, nil)
+	}
+	matrix := dataframe.NewFromSeries(pool, ss)
+
+	fmt.Println("Matrix:")
+	table = array.NewTableReader(matrix, 2)
+	n = 0
+	for table.Next() {
+		rec := table.Record()
+		for i, col := range rec.Columns() {
+			fmt.Printf("rec[%d][%q]: %v\n", n, rec.ColumnName(i), col)
+		}
+		n++
+	}
+	table.Release()
 
 	// Output:
 	// USERS:
