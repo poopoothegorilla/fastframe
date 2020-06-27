@@ -213,19 +213,20 @@ func TestNewFromCSV(t *testing.T) {
 		{
 			// TODO: CHANGE THE FIELDS TO BE ALL TYPES
 			scenario: "valid",
-			inCSV: `"f1-f64","f2-f64","f3-f64","f4-f64"
-1,11,111,1111
-2,22,222,2222
-3,33,333,3333
-4,44,444,4444
-5,55,555,5555`,
-			expNumCols: 4,
+			inCSV: `"f1-f64","f2-f64","f3-f64","f4-f64","f5-str"
+1,11,111,1111,john
+2,22,222,2222,jim
+3,33,333,3333,julie
+4,44,444,4444,alex
+5,55,555,5555,shaydul`,
+			expNumCols: 5,
 			expNumRows: 5,
 			exp: []interface{}{
-				[]float64{1, 2, 3, 4, 5},
-				[]float64{11, 22, 33, 44, 55},
-				[]float64{111, 222, 333, 444, 555},
-				[]float64{1111, 2222, 3333, 4444, 5555},
+				[]string{"1", "2", "3", "4", "5"},
+				[]string{"11", "22", "33", "44", "55"},
+				[]string{"111", "222", "333", "444", "555"},
+				[]string{"1111", "2222", "3333", "4444", "5555"},
+				[]string{"john", "jim", "julie", "alex", "shaydul"},
 			},
 		},
 	}
@@ -1755,7 +1756,7 @@ func TestPivot(t *testing.T) {
 		expHeaders   []string
 	}{
 		{
-			scenario: "pivot dataframe",
+			scenario: "series pivot dataframe",
 			inDataFrame: func(pool memory.Allocator) dataframe.DataFrame {
 				ss := []series.Series{
 					series.FromInt64(
@@ -1796,6 +1797,45 @@ func TestPivot(t *testing.T) {
 				[]int32{0, 0, 0, 44, 0, 0},
 				[]int32{0, 0, 0, 0, 55, 0},
 				[]int32{0, 0, 0, 0, 0, 1111},
+			},
+			expNAIndices: [][]int{
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+				[]int{},
+			},
+			expHeaders: []string{"idx", "100", "200", "300", "400", "500", "600"},
+		},
+		{
+			scenario: "csv pivot dataframe",
+			inDataFrame: func(pool memory.Allocator) dataframe.DataFrame {
+				f := strings.NewReader(`"idx","cols","vals"
+1,100,11
+2,200,22
+3,300,33
+4,400,44
+5,500,55
+6,600,1111`)
+
+				r := csv.NewReader(f)
+				return dataframe.NewFromCSV(pool, r, -1)
+			},
+			inIdxName:  "idx",
+			inColsName: "cols",
+			inValsName: "vals",
+			expNumCols: 7,
+			expNumRows: 6,
+			exp: []interface{}{
+				[]string{"1", "2", "3", "4", "5", "6"},
+				[]string{"11", "", "", "", "", ""},
+				[]string{"", "22", "", "", "", ""},
+				[]string{"", "", "33", "", "", ""},
+				[]string{"", "", "", "44", "", ""},
+				[]string{"", "", "", "", "55", ""},
+				[]string{"", "", "", "", "", "1111"},
 			},
 			expNAIndices: [][]int{
 				[]int{},

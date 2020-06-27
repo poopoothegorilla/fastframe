@@ -159,32 +159,32 @@ func NewFromCSV(pool memory.Allocator, r *csv.Reader, batchSize int) DataFrame {
 	if err != nil {
 		panic(fmt.Sprintf("dataframe: new_from_csv: %s", err))
 	}
+
+	var sb *array.StringBuilder
+
 	// TODO(poopoothegorilla): what about csvs without headers
 	headers := rows[0]
 	ss := make([]series.Series, len(headers))
-	b := array.NewFloat64Builder(pool)
-	defer b.Release()
+
 	for i, h := range headers {
-		field := arrow.Field{
-			Name:     h,
-			Type:     arrow.PrimitiveTypes.Float64,
-			Nullable: true,
+		field := arrow.Field{Name: h, Nullable: true}
+
+		// STRING
+		field.Type = arrow.BinaryTypes.String
+		if sb == nil {
+			sb = array.NewStringBuilder(pool)
+			defer sb.Release()
 		}
-		vals := make([]float64, len(rows)-1)
+		vals := make([]string, len(rows)-1)
 		for j, row := range rows {
 			if j == 0 {
 				continue
 			}
-			val, err := strconv.ParseFloat(string(row[i]), 64)
-			if err != nil {
-				panic(fmt.Sprintf("dataframe: new_from_csv: %s", err))
-			}
-			vals[j-1] = val
+			vals[j-1] = string(row[i])
 		}
-		b.AppendValues(vals, nil)
+		sb.AppendValues(vals, nil)
 
-		s := series.FromArrow(pool, field, b.NewArray())
-		ss[i] = s
+		ss[i] = series.FromArrow(pool, field, sb.NewArray())
 	}
 
 	return DataFrame{
@@ -288,6 +288,23 @@ func (df DataFrame) Retain() {
 // NOTE: regular API
 //////////////
 
+// Cast ...
+// TODO(poopoothegorilla): FINISH THIS
+func (df *DataFrame) Cast(name string, t arrow.DataType) {
+	df.Retain()
+	defer df.Release()
+
+	for i, s := range df.series {
+		if s.Name() == name {
+			ns := s.Cast(t)
+			// df.series[i] = ns
+			// s.Release()
+			return
+		}
+	}
+	panic(fmt.Sprintf("dataframe: cast: no series contain name %q", name))
+}
+
 // Series ...
 func (df DataFrame) Series(i int) series.Series {
 	return df.series[i]
@@ -298,8 +315,8 @@ func (df DataFrame) HasSeries(name string) bool {
 	df.Retain()
 	defer df.Release()
 
-	for _, series := range df.series {
-		if series.Name() == name {
+	for _, s := range df.series {
+		if s.Name() == name {
 			return true
 		}
 	}
@@ -312,9 +329,9 @@ func (df DataFrame) SeriesByName(name string) series.Series {
 	df.Retain()
 	defer df.Release()
 
-	for _, series := range df.series {
-		if series.Name() == name {
-			return series
+	for _, s := range df.series {
+		if s.Name() == name {
+			return s
 		}
 	}
 
