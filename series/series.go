@@ -84,6 +84,16 @@ func FromInterface(pool memory.Allocator, field arrow.Field, vals interface{}, v
 				float64s[i] = val
 			}
 			return FromFloat64(pool, field, float64s, valid)
+		case arrow.BinaryTypes.String:
+			strings := make([]string, len(vs))
+			for i, v := range vs {
+				val, ok := v.(string)
+				if !ok {
+					val = ""
+				}
+				strings[i] = val
+			}
+			return FromString(pool, field, strings, valid)
 		default:
 			panic(fmt.Sprintf("series: from_interface: unsupported type: %T", field.Type))
 		}
@@ -140,6 +150,19 @@ func FromFloat32(pool memory.Allocator, field arrow.Field, vals []float32, valid
 // FromFloat64 ...
 func FromFloat64(pool memory.Allocator, field arrow.Field, vals []float64, valid []bool) Series {
 	b := array.NewFloat64Builder(pool)
+	defer b.Release()
+	b.AppendValues(vals, valid)
+
+	return Series{
+		pool:      pool,
+		field:     field,
+		Interface: b.NewArray(),
+	}
+}
+
+// FromString ...
+func FromString(pool memory.Allocator, field arrow.Field, vals []string, valid []bool) Series {
+	b := array.NewStringBuilder(pool)
 	defer b.Release()
 	b.AppendValues(vals, valid)
 
@@ -214,6 +237,8 @@ func (s Series) Value(i int) interface{} {
 		v = s.Interface.(*array.Float32).Value(i)
 	case arrow.PrimitiveTypes.Float64:
 		v = s.Interface.(*array.Float64).Value(i)
+	case arrow.BinaryTypes.String:
+		v = s.Interface.(*array.String).Value(i)
 	default:
 		panic("series.Value: unknown type")
 	}
@@ -324,6 +349,12 @@ func (s Series) Values() interface{} {
 		return s.Interface.(*array.Float32).Float32Values()
 	case arrow.PrimitiveTypes.Float64:
 		return s.Interface.(*array.Float64).Float64Values()
+	case arrow.BinaryTypes.String:
+		vals := make([]string, s.Len())
+		for i := 0; i < s.Len(); i++ {
+			vals[i] = s.Interface.(*array.String).Value(i)
+		}
+		return vals
 	default:
 		panic("series: unknown type")
 	}
@@ -355,6 +386,10 @@ func (s Series) StringValues() []string {
 		vs := s.Interface.(*array.Float64).Float64Values()
 		for _, v := range vs {
 			res = append(res, strconv.FormatFloat(v, 'f', -1, 64))
+		}
+	case arrow.BinaryTypes.String:
+		for i := 0; i < s.Len(); i++ {
+			res = append(res, s.Interface.(*array.String).Value(i))
 		}
 	default:
 		panic("series: unknown type")
@@ -412,8 +447,18 @@ func (s Series) AtVec(i int) float64 {
 		return float64(val)
 	case arrow.PrimitiveTypes.Float64:
 		return s.Interface.(*array.Float64).Value(i)
+	case arrow.BinaryTypes.String:
+		val := s.Interface.(*array.String).Value(i)
+		if val == "" {
+			return 0
+		}
+		v, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			panic(fmt.Sprintf("series: at_vec: %s", err))
+		}
+		return v
 	default:
-		panic("series: unknown type")
+		panic("series: at_vec: unknown type")
 	}
 }
 
@@ -428,6 +473,24 @@ func (s Series) AtVec(i int) float64 {
 //////////////
 // NOTE: regular API
 //////////////
+
+// Cast ...
+// TODO(poopoothegorilla): FINISH this
+func (s Series) Cast(t arrow.DataType) Series {
+	s.Retain()
+	defer s.Release()
+
+	switch s.field.Type {
+	case arrow.PrimitiveTypes.Int32:
+	case arrow.PrimitiveTypes.Int64:
+	case arrow.PrimitiveTypes.Float32:
+	case arrow.PrimitiveTypes.Float64:
+	case arrow.BinaryTypes.String:
+	// case arrow.PrimitiveTypes.Uint64:
+	default:
+		panic("series: cast: unsupported type")
+	}
+}
 
 // Unique ...
 func (s Series) Unique() Series {
@@ -447,6 +510,9 @@ func (s Series) Unique() Series {
 	case arrow.PrimitiveTypes.Float64:
 		vals := float64Unique(s.Interface.(*array.Float64))
 		return FromFloat64(s.pool, s.field, vals, nil)
+	case arrow.BinaryTypes.String:
+		vals := stringUnique(s.Interface.(*array.String))
+		return FromString(s.pool, s.field, vals, nil)
 	// case arrow.PrimitiveTypes.Uint64:
 	default:
 		panic("series: unique: unsupported type")
@@ -469,6 +535,7 @@ func (s Series) FindIndices(val interface{}) []int {
 			}
 			val = int32(b)
 		}
+
 		for i, v := range vals {
 			if v != val || s.IsNull(i) {
 				continue
@@ -476,6 +543,15 @@ func (s Series) FindIndices(val interface{}) []int {
 			result = append(result, i)
 		}
 	case []int64:
+		switch v := val.(type) {
+		case string:
+			b, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				panic(fmt.Sprintf("series: find_indices:", err))
+			}
+			val = b
+		}
+
 		for i, v := range vals {
 			if v != val || s.IsNull(i) {
 				continue
@@ -483,6 +559,15 @@ func (s Series) FindIndices(val interface{}) []int {
 			result = append(result, i)
 		}
 	case []float32:
+		switch v := val.(type) {
+		case string:
+			b, err := strconv.ParseFloat(v, 32)
+			if err != nil {
+				panic(fmt.Sprintf("series: find_indices:", err))
+			}
+			val = float32(b)
+		}
+
 		for i, v := range vals {
 			if v != val || s.IsNull(i) {
 				continue
@@ -490,6 +575,22 @@ func (s Series) FindIndices(val interface{}) []int {
 			result = append(result, i)
 		}
 	case []float64:
+		switch v := val.(type) {
+		case string:
+			b, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				panic(fmt.Sprintf("series: find_indices:", err))
+			}
+			val = b
+		}
+
+		for i, v := range vals {
+			if v != val || s.IsNull(i) {
+				continue
+			}
+			result = append(result, i)
+		}
+	case []string:
 		for i, v := range vals {
 			if v != val || s.IsNull(i) {
 				continue

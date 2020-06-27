@@ -188,6 +188,18 @@ func float64Unique(a *array.Float64) []float64 {
 	}
 	return result
 }
+func stringUnique(a *array.String) []string {
+	set := make(map[string]struct{})
+	result := make([]string, 0, a.Len())
+	for i := 0; i < a.Len(); i++ {
+		val := a.Value(i)
+		if _, ok := set[val]; !ok {
+			set[val] = struct{}{}
+			result = append(result, val)
+		}
+	}
+	return result
+}
 
 // DROPINDICES
 func int32DropIndices(a *array.Int32, indices []int) []int32 {
