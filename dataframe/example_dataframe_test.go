@@ -151,7 +151,7 @@ func Example() {
 		}
 		vals := make([]float64, nr)
 		for j := 0; j < nr; j++ {
-			vals[j] = pivot.Dot(i, j)
+			vals[j] = pivot.Dot(i, j) / (pivot.RowNorm(i) * pivot.RowNorm(j))
 		}
 		ss[i] = series.FromFloat64(pool, field, vals, nil)
 	}
