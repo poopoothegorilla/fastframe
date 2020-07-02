@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 
@@ -1136,14 +1137,29 @@ func (df DataFrame) Value(rowi, coli int) interface{} {
 // AxBx + AyBy + AzBz ...
 func (df DataFrame) Dot(rowi, rowj int) float64 {
 	df.Retain()
-	defer df.Release()
 
 	var res float64
 	for _, c := range df.series {
 		res += c.AtVec(rowi) * c.AtVec(rowj)
 	}
 
+	df.Release()
 	return res
+}
+
+// RowNorm ...
+//
+// SQRT( Ax^2 + Ay^2 + Az^2 )
+func (df DataFrame) RowNorm(i int) float64 {
+	df.Retain()
+
+	var res float64
+	for _, c := range df.series {
+		res += math.Pow(c.AtVec(i), 2)
+	}
+
+	df.Release()
+	return math.Sqrt(res)
 }
 
 // Pivot ...
