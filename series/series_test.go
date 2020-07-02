@@ -2385,3 +2385,54 @@ func TestAppend(t *testing.T) {
 		})
 	}
 }
+
+func TestCast(t *testing.T) {
+	type inDataType struct {
+		dataType arrow.DataType
+		expVals  interface{}
+	}
+
+	tests := []struct {
+		scenario string
+
+		inSeries func(memory.Allocator) series.Series
+
+		inDataTypes []inDataType
+	}{
+		{
+			scenario: "int32 column",
+			inSeries: func(pool memory.Allocator) series.Series {
+				field := arrow.Field{Name: "i32", Type: arrow.PrimitiveTypes.Int32}
+				data := []int32{1, 2, 3, 4, 5, 6}
+				var valid []bool = nil
+
+				return series.FromInt32(pool, field, data, valid)
+			},
+			inDataTypes: []inDataType{
+				inDataType{dataType: arrow.PrimitiveTypes.Int32, expVals: []int32{1, 2, 3, 4, 5, 6}},
+				inDataType{dataType: arrow.PrimitiveTypes.Int64, expVals: []int64{1, 2, 3, 4, 5, 6}},
+				inDataType{dataType: arrow.PrimitiveTypes.Float32, expVals: []float32{1, 2, 3, 4, 5, 6}},
+				inDataType{dataType: arrow.PrimitiveTypes.Float64, expVals: []float64{1, 2, 3, 4, 5, 6}},
+				inDataType{dataType: arrow.BinaryTypes.String, expVals: []string{"1", "2", "3", "4", "5", "6"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			pool := memory.NewCheckedAllocator(memory.NewGoAllocator())
+			defer pool.AssertSize(t, 0)
+
+			actSeries := tt.inSeries(pool)
+			defer actSeries.Release()
+
+			for _, inDataType := range tt.inDataTypes {
+				cast := actSeries.Cast(inDataType.dataType)
+				defer cast.Release()
+
+				assert.Equal(t, inDataType.dataType, cast.DataType())
+				assert.Equal(t, inDataType.expVals, cast.Values())
+			}
+		})
+	}
+}

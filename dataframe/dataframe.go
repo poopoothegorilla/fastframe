@@ -289,20 +289,26 @@ func (df DataFrame) Retain() {
 //////////////
 
 // Cast ...
-// TODO(poopoothegorilla): FINISH THIS
-func (df *DataFrame) Cast(name string, t arrow.DataType) {
+func (df *DataFrame) Cast(cList map[string]arrow.DataType) DataFrame {
 	df.Retain()
 	defer df.Release()
 
+	ss := make([]series.Series, len(df.series))
+	var found int
 	for i, s := range df.series {
-		if s.Name() == name {
-			ns := s.Cast(t)
-			// df.series[i] = ns
-			// s.Release()
-			return
+		t, ok := cList[s.Name()]
+		if !ok {
+			ss[i] = s
+			continue
 		}
+		ss[i] = s.Cast(t)
+		found++
 	}
-	panic(fmt.Sprintf("dataframe: cast: no series contain name %q", name))
+	if found != len(cList) {
+		panic(fmt.Sprintf("dataframe: cast: not all series exist %+x", cList))
+	}
+
+	return NewFromSeries(df.pool, ss)
 }
 
 // Series ...

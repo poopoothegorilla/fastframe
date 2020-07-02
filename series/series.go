@@ -480,16 +480,23 @@ func (s Series) Cast(t arrow.DataType) Series {
 	s.Retain()
 	defer s.Release()
 
-	switch s.field.Type {
+	switch t {
 	case arrow.PrimitiveTypes.Int32:
+		return castToInt32(s)
 	case arrow.PrimitiveTypes.Int64:
+		return castToInt64(s)
 	case arrow.PrimitiveTypes.Float32:
+		return castToFloat32(s)
 	case arrow.PrimitiveTypes.Float64:
+		return castToFloat64(s)
 	case arrow.BinaryTypes.String:
+		return castToString(s)
 	// case arrow.PrimitiveTypes.Uint64:
 	default:
 		panic("series: cast: unsupported type")
 	}
+
+	return s
 }
 
 // Unique ...
@@ -531,7 +538,7 @@ func (s Series) FindIndices(val interface{}) []int {
 		case string:
 			b, err := strconv.ParseInt(v, 10, 32)
 			if err != nil {
-				panic(fmt.Sprintf("series: find_indices:", err))
+				panic(fmt.Sprintf("series: find_indices: %s", err))
 			}
 			val = int32(b)
 		}
@@ -547,7 +554,7 @@ func (s Series) FindIndices(val interface{}) []int {
 		case string:
 			b, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				panic(fmt.Sprintf("series: find_indices:", err))
+				panic(fmt.Sprintf("series: find_indices: %s", err))
 			}
 			val = b
 		}
@@ -563,7 +570,7 @@ func (s Series) FindIndices(val interface{}) []int {
 		case string:
 			b, err := strconv.ParseFloat(v, 32)
 			if err != nil {
-				panic(fmt.Sprintf("series: find_indices:", err))
+				panic(fmt.Sprintf("series: find_indices: %s", err))
 			}
 			val = float32(b)
 		}
@@ -579,7 +586,7 @@ func (s Series) FindIndices(val interface{}) []int {
 		case string:
 			b, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				panic(fmt.Sprintf("series: find_indices:", err))
+				panic(fmt.Sprintf("series: find_indices: %s", err))
 			}
 			val = b
 		}

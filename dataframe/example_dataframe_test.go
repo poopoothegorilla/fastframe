@@ -104,12 +104,14 @@ fig,3,112,5`)
 func Example() {
 	pool := memory.NewGoAllocator()
 
-	movieRatingsDF := generateMovieRatingsDF(pool)
-	defer movieRatingsDF.Release()
-
-	movieRatingsDF.Cast("user_id", arrow.PrimitiveTypes.Int32)
-	movieRatingsDF.Cast("movie_id", arrow.PrimitiveTypes.Int64)
-	movieRatingsDF.Cast("rating", arrow.PrimitiveTypes.Float64)
+	rawMovieRatingsDF := generateMovieRatingsDF(pool)
+	castList := map[string]arrow.DataType{
+		"user_id":  arrow.PrimitiveTypes.Int32,
+		"movie_id": arrow.PrimitiveTypes.Int64,
+		"rating":   arrow.PrimitiveTypes.Float64,
+	}
+	movieRatingsDF := rawMovieRatingsDF.Cast(castList)
+	rawMovieRatingsDF.Release()
 
 	// TODO(poopoothegorilla): the column output format is not the same if
 	// chunksize is larger than total rows.
@@ -155,7 +157,7 @@ func Example() {
 	}
 	matrix := dataframe.NewFromSeries(pool, ss)
 
-	fmt.Println("Matrix:")
+	fmt.Println("MATRIX:")
 	table = array.NewTableReader(matrix, 2)
 	n = 0
 	for table.Next() {
