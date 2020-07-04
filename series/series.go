@@ -397,6 +397,11 @@ func (s Series) StringValues() []string {
 	return res
 }
 
+// String ...
+func (s Series) String() string {
+	return fmt.Sprintf("%v", s.Interface)
+}
+
 // Field ...
 func (s Series) Field() arrow.Field {
 	return s.field

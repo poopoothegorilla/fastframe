@@ -3,14 +3,12 @@ package dataframe_test
 import (
 	"encoding/csv"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
 	"github.com/poopoothegorilla/fastframe/dataframe"
-	"github.com/poopoothegorilla/fastframe/series"
 )
 
 // func generateUsersDF(pool memory.Allocator) dataframe.DataFrame {
@@ -68,7 +66,7 @@ fig,3,112,5`)
 
 	r := csv.NewReader(f)
 
-	return dataframe.NewFromCSV(pool, r, -1)
+	return dataframe.NewFromCSV(pool, r, -1, nil)
 }
 
 // func generateMovieRatingsDF(pool memory.Allocator) dataframe.DataFrame {
@@ -141,21 +139,8 @@ func Example() {
 	}
 	table.Release()
 
-	nr := int(pivot.NumRows())
-	ss := make([]series.Series, nr)
-	for i := 0; i < nr; i++ {
-		field := arrow.Field{
-			Name:     strconv.Itoa(i),
-			Type:     arrow.PrimitiveTypes.Float64,
-			Nullable: true,
-		}
-		vals := make([]float64, nr)
-		for j := 0; j < nr; j++ {
-			vals[j] = pivot.Dot(i, j) / (pivot.RowNorm(i) * pivot.RowNorm(j))
-		}
-		ss[i] = series.FromFloat64(pool, field, vals, nil)
-	}
-	matrix := dataframe.NewFromSeries(pool, ss)
+	matrix := pivot.CosineSimilarity()
+	pivot.Release()
 
 	fmt.Println("MATRIX:")
 	table = array.NewTableReader(matrix, 2)
@@ -168,23 +153,44 @@ func Example() {
 		n++
 	}
 	table.Release()
-
+	matrix.Release()
 	// Output:
-	// USERS:
-	// rec[0]["id"]: [1000 21407]
-	// rec[0]["age"]: [20 16]
-	// rec[1]["id"]: [898989 8888]
-	// rec[1]["age"]: [35 66]
-	// rec[2]["id"]: [101292]
-	// rec[2]["age"]: [50]
 	// MOVIE RATINGS:
-	// rec[0]["user_id"]: [1000 21407]
-	// rec[0]["movie_id"]: [1000 21407]
-	// rec[0]["rating"]: [20 16]
-	// rec[1]["user_id"]: [898989 8888]
-	// rec[1]["movie_id"]: [898989 8888]
-	// rec[1]["rating"]: [35 66]
-	// rec[2]["user_id"]: [101292]
-	// rec[2]["movie_id"]: [101292]
-	// rec[2]["rating"]: [50]
+	// rec[0]["user_name"]: ["jim" "jim" "jim" "jim" "jim"]
+	// rec[0]["user_id"]: [1 1 1 1 1]
+	// rec[0]["movie_id"]: [2 29 32 47 50]
+	// rec[0]["rating"]: [3.5 3.5 3.5 3.5 3.5]
+	// rec[1]["user_name"]: ["jim" "joe" "joe" "joe" "joe"]
+	// rec[1]["user_id"]: [1 2 2 2 2]
+	// rec[1]["movie_id"]: [112 3 29 62 70]
+	// rec[1]["rating"]: [3.5 4 5 5 5]
+	// rec[2]["user_name"]: ["joe" "joe" "joe" "joe" "fig"]
+	// rec[2]["user_id"]: [2 2 2 2 3]
+	// rec[2]["movie_id"]: [47 110 242 260 62]
+	// rec[2]["rating"]: [4 4 3 5 4]
+	// rec[3]["user_name"]: ["fig" "fig" "fig"]
+	// rec[3]["user_id"]: [3 3 3]
+	// rec[3]["movie_id"]: [50 70 112]
+	// rec[3]["rating"]: [3.5 2 5]
+	// PIVOT:
+	// rec[0]["user_id"]: [1 2 3]
+	// rec[0]["2"]: [3.5 0 0]
+	// rec[0]["29"]: [3.5 5 0]
+	// rec[0]["32"]: [3.5 0 0]
+	// rec[0]["47"]: [3.5 4 0]
+	// rec[0]["50"]: [3.5 0 3.5]
+	// rec[0]["112"]: [3.5 0 5]
+	// rec[0]["3"]: [0 4 0]
+	// rec[0]["62"]: [0 5 4]
+	// rec[0]["70"]: [0 5 2]
+	// rec[0]["110"]: [0 4 0]
+	// rec[0]["242"]: [0 3 0]
+	// rec[0]["260"]: [0 5 0]
+	// MATRIX:
+	// rec[0]["0"]: [1 0.30588186723552135]
+	// rec[0]["1"]: [0.30588186723552135 1]
+	// rec[0]["2"]: [0.46616560472322743 0.3485753093366648]
+	// rec[1]["0"]: [0.46616560472322743]
+	// rec[1]["1"]: [0.3485753093366648]
+	// rec[1]["2"]: [1]
 }

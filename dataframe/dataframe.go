@@ -154,38 +154,57 @@ func NewFromSeries(pool memory.Allocator, series []series.Series) DataFrame {
 }
 
 // NewFromCSV ...
-func NewFromCSV(pool memory.Allocator, r *csv.Reader, batchSize int) DataFrame {
+//
+// TODO(poopoothegorilla): maybe change the batchSize and type List to Optional
+// Option params
+func NewFromCSV(pool memory.Allocator, r *csv.Reader, batchSize int, tList map[string]arrow.DataType) DataFrame {
 	// TODO(poopoothegorilla): add batching
 	rows, err := r.ReadAll()
 	if err != nil {
 		panic(fmt.Sprintf("dataframe: new_from_csv: %s", err))
 	}
 
-	var sb *array.StringBuilder
+	var (
+		sb *array.StringBuilder
+		// i32b *array.Int32Builder
+		// i64b *array.Int64Builder
+		// f32b *array.Float32Builder
+		// f64b *array.Float64Builder
+	)
 
 	// TODO(poopoothegorilla): what about csvs without headers
 	headers := rows[0]
 	ss := make([]series.Series, len(headers))
 
-	for i, h := range headers {
-		field := arrow.Field{Name: h, Nullable: true}
+	for i, header := range headers {
+		field := arrow.Field{Name: header, Nullable: true}
 
-		// STRING
-		field.Type = arrow.BinaryTypes.String
-		if sb == nil {
-			sb = array.NewStringBuilder(pool)
-			defer sb.Release()
-		}
-		vals := make([]string, len(rows)-1)
-		for j, row := range rows {
-			if j == 0 {
-				continue
+		switch tList[header] {
+		// TODO(poopoothegorilla: add more types)
+		// case arrow.PrimitiveTypes.Int32:
+		// case arrow.PrimitiveTypes.Int64:
+		// case arrow.PrimitiveTypes.Float32:
+		// case arrow.PrimitiveTypes.Float64:
+		case arrow.BinaryTypes.String:
+			// String is default
+			fallthrough
+		default:
+			// STRING
+			field.Type = arrow.BinaryTypes.String
+			if sb == nil {
+				sb = array.NewStringBuilder(pool)
+				defer sb.Release()
 			}
-			vals[j-1] = string(row[i])
+			vals := make([]string, len(rows)-1)
+			for j, row := range rows {
+				if j == 0 {
+					continue
+				}
+				vals[j-1] = string(row[i])
+			}
+			sb.AppendValues(vals, nil)
+			ss[i] = series.FromArrow(pool, field, sb.NewArray())
 		}
-		sb.AppendValues(vals, nil)
-
-		ss[i] = series.FromArrow(pool, field, sb.NewArray())
 	}
 
 	return DataFrame{
@@ -290,7 +309,7 @@ func (df DataFrame) Retain() {
 //////////////
 
 // Cast ...
-func (df *DataFrame) Cast(cList map[string]arrow.DataType) DataFrame {
+func (df DataFrame) Cast(cList map[string]arrow.DataType) DataFrame {
 	df.Retain()
 	defer df.Release()
 
@@ -1215,4 +1234,27 @@ func (df DataFrame) Pivot(idx, cols, vals string) DataFrame {
 		pool:   df.pool,
 		series: ss,
 	}
+}
+
+// CosineSimilarity ...
+func (df DataFrame) CosineSimilarity() DataFrame {
+	df.Retain()
+	defer df.Release()
+
+	nr := int(df.NumRows())
+	ss := make([]series.Series, nr)
+	for i := 0; i < nr; i++ {
+		field := arrow.Field{
+			Name:     strconv.Itoa(i),
+			Type:     arrow.PrimitiveTypes.Float64,
+			Nullable: true,
+		}
+		vals := make([]float64, nr)
+		for j := 0; j < nr; j++ {
+			vals[j] = df.Dot(i, j) / (df.RowNorm(i) * df.RowNorm(j))
+		}
+		ss[i] = series.FromFloat64(df.pool, field, vals, nil)
+	}
+
+	return NewFromSeries(df.pool, ss)
 }

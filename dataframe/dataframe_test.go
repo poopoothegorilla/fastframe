@@ -238,7 +238,7 @@ func TestNewFromCSV(t *testing.T) {
 
 			inCSVReader := csv.NewReader(strings.NewReader(tt.inCSV))
 
-			act := dataframe.NewFromCSV(pool, inCSVReader, -1)
+			act := dataframe.NewFromCSV(pool, inCSVReader, -1, nil)
 			defer act.Release()
 
 			numR, numC := act.Dims()
@@ -1821,7 +1821,7 @@ func TestPivot(t *testing.T) {
 6,600,1111`)
 
 				r := csv.NewReader(f)
-				return dataframe.NewFromCSV(pool, r, -1)
+				return dataframe.NewFromCSV(pool, r, -1, nil)
 			},
 			inIdxName:  "idx",
 			inColsName: "cols",
