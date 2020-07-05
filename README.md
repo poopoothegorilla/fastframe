@@ -7,7 +7,7 @@ storage.
 
 ## Benchmarks
 
-Some of the benchmarks show where columnar / arrow based computation are benificial. 
+Some of the benchmarks show where columnar / arrow based computation are beneficial. 
 
 https://github.com/poopoothegorilla/fastframe/wiki/Benchmarks:-Series
 
