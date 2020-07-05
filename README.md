@@ -141,3 +141,7 @@ func Example() {
 	// rec[1]["2"]: [1]
 }
 ```
+
+## Similar Projects
+
+Bullseye (https://github.com/go-bullseye/bullseye): Another DataFrame project backed by Arrow. This project might merge with this project.
