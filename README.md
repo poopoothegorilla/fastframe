@@ -5,6 +5,17 @@ FastFrame is a DataFrame project which utilizes Apache Arrow
 (https://github.com/apache/arrow/tree/master/go) for the underlying data
 storage.
 
+## Benchmarks
+
+Some of the benchmarks show where columnar / arrow based computation are benificial. 
+
+https://github.com/poopoothegorilla/fastframe/wiki/Benchmarks:-Series
+
+### DataFrame
+
+Currently, the code for the joins could be improved.
+https://github.com/poopoothegorilla/fastframe/wiki/Benchmarks:-Datafame
+
 ## Example
 
 This is an example of calculating cosine similarity
