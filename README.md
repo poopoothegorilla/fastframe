@@ -1,5 +1,5 @@
 # FastFrame
-[![CircleCI](https://circleci.com/gh/poopoothegorilla/fastframe.svg?style=svg)](https://circleci.com/gh/poopoothegorilla/fastframe)
+[![CircleCI](https://circleci.com/gh/poopoothegorilla/fastframe.svg?style=shield)](https://circleci.com/gh/poopoothegorilla/fastframe)
 
 WARNING: DO NOT USE IN PRODUCTION EVERYTHING IS EXPERIMENTAL
 
