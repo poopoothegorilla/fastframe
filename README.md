@@ -1,5 +1,6 @@
 # FastFrame
 [![CircleCI](https://circleci.com/gh/poopoothegorilla/fastframe.svg?style=shield)](https://circleci.com/gh/poopoothegorilla/fastframe)
+[![Go Report Card](https://goreportcard.com/badge/github.com/poopoothegorilla/fastframe)](https://goreportcard.com/report/github.com/poopoothegorilla/fastframe)
 
 WARNING: DO NOT USE IN PRODUCTION EVERYTHING IS EXPERIMENTAL
 
