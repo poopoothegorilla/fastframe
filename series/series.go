@@ -400,12 +400,12 @@ func (s Series) StringValues() []string {
 	return res
 }
 
-// String ...
+// String returns a representation of the data as a string.
 func (s Series) String() string {
 	return fmt.Sprintf("%v", s.Interface)
 }
 
-// Field ...
+// Field returns the Arrow field associated with the Series.
 func (s Series) Field() arrow.Field {
 	return s.field
 }
@@ -419,17 +419,17 @@ func (s Series) Name() string {
 // NOTE: for gonum Matrix interface
 //////////////
 
-// Dims ...
+// Dims returns the dimensions of the Series as rows and columns.
 func (s Series) Dims() (r, c int) {
 	return s.Len(), 1
 }
 
-// At ...
+// At returns the float64 value at the i position in the Series.
 func (s Series) At(i, _ int) float64 {
 	return s.AtVec(i)
 }
 
-// T ...
+// T returns the transpose of the Series which is itself.
 func (s Series) T() mat.Matrix {
 	return s
 }
@@ -618,7 +618,8 @@ func (s Series) FindIndices(val interface{}) []int {
 	return result
 }
 
-// NAIndices ...
+// NAIndices returns the indices where values are null.
+//
 // TODO{poopoothegorilla): COULD BE IMPROVED PERFORMANCE WISE... MAYBE USE NULL BITMASK
 func (s Series) NAIndices() []int {
 	s.Retain()
@@ -845,7 +846,8 @@ func (s Series) Map(fn func(interface{}) interface{}) Series {
 	}
 }
 
-// Condition ...
+// Condition represents a function which can be applied to any value and return
+// a boolean.
 type Condition func(interface{}) bool
 
 // Where returns a Series where values satisfy any of the conditions.
