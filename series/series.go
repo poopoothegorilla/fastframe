@@ -13,6 +13,8 @@ import (
 	"gonum.org/v1/gonum/stat"
 )
 
+// TODO(poopoothegorilla): NA vs NULL NAMING CONVENTION?
+
 // Series ...
 // TODO: TRY A CHUNKED / COLUMN VERSION OF SERIES
 // TODO: ADD PRECISION
@@ -22,7 +24,7 @@ type Series struct {
 	array.Interface
 }
 
-// FromArrow ...
+// FromArrow creates a Series from an Arrow array.
 func FromArrow(pool memory.Allocator, field arrow.Field, column array.Interface) Series {
 	return Series{
 		pool:      pool,
@@ -31,7 +33,7 @@ func FromArrow(pool memory.Allocator, field arrow.Field, column array.Interface)
 	}
 }
 
-// FromInterface ...
+// FromInterface creates a Series from a slice of supported types.
 func FromInterface(pool memory.Allocator, field arrow.Field, vals interface{}, valid []bool) Series {
 	switch vs := vals.(type) {
 	case []int32:
@@ -104,7 +106,8 @@ func FromInterface(pool memory.Allocator, field arrow.Field, vals interface{}, v
 	return Series{}
 }
 
-// FromInt32 ...
+// FromInt32 creates a Series from a slice of int32 values.
+//
 // TODO(poopoothegorilla): might be worth creating a pool of builders and
 // recycling them.
 // TODO(poopoothegorilla): should the arrow.Field be replaced by a string param
@@ -121,7 +124,7 @@ func FromInt32(pool memory.Allocator, field arrow.Field, vals []int32, valid []b
 	}
 }
 
-// FromInt64 ...
+// FromInt64 creates a Series from a slice of int64 values.
 func FromInt64(pool memory.Allocator, field arrow.Field, vals []int64, valid []bool) Series {
 	b := array.NewInt64Builder(pool)
 	defer b.Release()
@@ -134,7 +137,7 @@ func FromInt64(pool memory.Allocator, field arrow.Field, vals []int64, valid []b
 	}
 }
 
-// FromFloat32 ...
+// FromFloat32 creates a Series from a slice of float32 values.
 func FromFloat32(pool memory.Allocator, field arrow.Field, vals []float32, valid []bool) Series {
 	b := array.NewFloat32Builder(pool)
 	defer b.Release()
@@ -147,7 +150,7 @@ func FromFloat32(pool memory.Allocator, field arrow.Field, vals []float32, valid
 	}
 }
 
-// FromFloat64 ...
+// FromFloat64 creates a Series from a slice of float64 values.
 func FromFloat64(pool memory.Allocator, field arrow.Field, vals []float64, valid []bool) Series {
 	b := array.NewFloat64Builder(pool)
 	defer b.Release()
@@ -160,7 +163,7 @@ func FromFloat64(pool memory.Allocator, field arrow.Field, vals []float64, valid
 	}
 }
 
-// FromString ...
+// FromString creates a Series from a slice of string values.
 func FromString(pool memory.Allocator, field arrow.Field, vals []string, valid []bool) Series {
 	b := array.NewStringBuilder(pool)
 	defer b.Release()
@@ -212,7 +215,7 @@ func (s Series) Empty(n int) Series {
 	return FromArrow(s.pool, s.field, col)
 }
 
-// Column ...
+// Column returns an Arrow array column.
 func (s Series) Column() *array.Column {
 	s.Retain()
 	defer s.Release()
@@ -223,7 +226,7 @@ func (s Series) Column() *array.Column {
 	return array.NewColumn(s.field, chunks)
 }
 
-// Value ...
+// Value returns the value at position i from the Series as an interface.
 func (s Series) Value(i int) interface{} {
 	s.Retain()
 
@@ -247,7 +250,7 @@ func (s Series) Value(i int) interface{} {
 	return v
 }
 
-// Int32 ...
+// Int32 returns the value at position i from the Series as an int32.
 func (s Series) Int32(i int) int32 {
 	s.Retain()
 
@@ -269,7 +272,7 @@ func (s Series) Int32(i int) int32 {
 	return v
 }
 
-// Int64 ...
+// Int64 returns the value at position i from the Series as an int64.
 func (s Series) Int64(i int) int64 {
 	s.Retain()
 
@@ -291,7 +294,7 @@ func (s Series) Int64(i int) int64 {
 	return v
 }
 
-// Float32 ...
+// Float32 returns the value at position i from the Series as an float32.
 func (s Series) Float32(i int) float32 {
 	s.Retain()
 
@@ -313,7 +316,7 @@ func (s Series) Float32(i int) float32 {
 	return v
 }
 
-// Float64 ...
+// Float64 returns the value at position i from the Series as an float64.
 func (s Series) Float64(i int) float64 {
 	s.Retain()
 
@@ -335,7 +338,7 @@ func (s Series) Float64(i int) float64 {
 	return v
 }
 
-// Values ...
+// Values returns the values of the Series as a slice of types.
 func (s Series) Values() interface{} {
 	s.Retain()
 	defer s.Release()
@@ -360,7 +363,7 @@ func (s Series) Values() interface{} {
 	}
 }
 
-// StringValues ...
+// StringValues returns the values of the Series as a slice of strings.
 func (s Series) StringValues() []string {
 	s.Retain()
 	defer s.Release()
@@ -407,7 +410,7 @@ func (s Series) Field() arrow.Field {
 	return s.field
 }
 
-// Name ...
+// Name returns the Series name.
 func (s Series) Name() string {
 	return s.field.Name
 }
@@ -435,7 +438,7 @@ func (s Series) T() mat.Matrix {
 // NOTE: for gonum Vector interface
 //////////////
 
-// AtVec ...
+// AtVec returns a float64 value at position i.
 func (s Series) AtVec(i int) float64 {
 	s.Retain()
 	defer s.Release()
@@ -479,8 +482,7 @@ func (s Series) AtVec(i int) float64 {
 // NOTE: regular API
 //////////////
 
-// Cast ...
-// TODO(poopoothegorilla): FINISH this
+// Cast returns a new series of t type.
 func (s Series) Cast(t arrow.DataType) Series {
 	s.Retain()
 	defer s.Release()
@@ -504,12 +506,15 @@ func (s Series) Cast(t arrow.DataType) Series {
 	return s
 }
 
-// Unique ...
+// Unique returns a new series with only unique values.
 func (s Series) Unique() Series {
 	s.Retain()
 	defer s.Release()
 
 	switch s.field.Type {
+	case arrow.BinaryTypes.String:
+		vals := stringUnique(s.Interface.(*array.String))
+		return FromString(s.pool, s.field, vals, nil)
 	case arrow.PrimitiveTypes.Int32:
 		vals := int32Unique(s.Interface.(*array.Int32))
 		return FromInt32(s.pool, s.field, vals, nil)
@@ -522,16 +527,13 @@ func (s Series) Unique() Series {
 	case arrow.PrimitiveTypes.Float64:
 		vals := float64Unique(s.Interface.(*array.Float64))
 		return FromFloat64(s.pool, s.field, vals, nil)
-	case arrow.BinaryTypes.String:
-		vals := stringUnique(s.Interface.(*array.String))
-		return FromString(s.pool, s.field, vals, nil)
 	// case arrow.PrimitiveTypes.Uint64:
 	default:
 		panic("series: unique: unsupported type")
 	}
 }
 
-// FindIndices ...
+// FindIndices returns a slice of indices where the value exists.
 func (s Series) FindIndices(val interface{}) []int {
 	s.Retain()
 	defer s.Release()
@@ -617,8 +619,7 @@ func (s Series) FindIndices(val interface{}) []int {
 }
 
 // NAIndices ...
-// TODO: COULD BE IMPROVED PERFORMANCE WISE... MAYBE USE NULL BITMASK
-// TODO: NA vs NULL NAMING CONVENTION?
+// TODO{poopoothegorilla): COULD BE IMPROVED PERFORMANCE WISE... MAYBE USE NULL BITMASK
 func (s Series) NAIndices() []int {
 	s.Retain()
 
@@ -635,7 +636,7 @@ func (s Series) NAIndices() []int {
 	return result
 }
 
-// IsNA ...
+// IsNA returns a slice of bools indicating positions where values are null.
 func (s Series) IsNA() []bool {
 	s.Retain()
 
@@ -648,8 +649,10 @@ func (s Series) IsNA() []bool {
 	return result
 }
 
-// DropIndices ...
-// TODO: MAYBE ADD DropByMask?
+// DropIndices returns a Series without values located at the provided indices.
+//
+// TODO(poopoothegorilla): add DropByMask either as seperate function or choose
+// by options.
 func (s Series) DropIndices(indices []int) Series {
 	s.Retain()
 	defer s.Release()
@@ -677,7 +680,8 @@ func (s Series) DropIndices(indices []int) Series {
 	}
 }
 
-// SelectIndices ...
+// SelectIndices returns a Series with values only present in the provided
+// indices.
 func (s Series) SelectIndices(indices []int) Series {
 	s.Retain()
 	defer s.Release()
@@ -705,8 +709,7 @@ func (s Series) SelectIndices(indices []int) Series {
 	}
 }
 
-// Truncate ...
-// NOTE: accept options instead of just index pos
+// Truncate returns a truncated Series.
 func (s Series) Truncate(i, j int64) Series {
 	s.Retain()
 	defer s.Release()
@@ -720,7 +723,7 @@ func (s Series) Truncate(i, j int64) Series {
 	return ss
 }
 
-// Sum ...
+// Sum returns the sum of all values in the Series as a float64 value.
 func (s Series) Sum() float64 {
 	s.Retain()
 	defer s.Release()
@@ -745,7 +748,7 @@ func (s Series) Sum() float64 {
 	}
 }
 
-// Magnitude ...
+// Magnitude returns the magnitude of the Series as a float64 value.
 func (s Series) Magnitude() float64 {
 	s.Retain()
 	defer s.Release()
@@ -767,7 +770,7 @@ func (s Series) Magnitude() float64 {
 	}
 }
 
-// STD ...
+// STD returns the standard deviation of the Series as a float64 value.
 func (s Series) STD() float64 {
 	s.Retain()
 	defer s.Release()
@@ -802,16 +805,14 @@ func (s Series) STD() float64 {
 	}
 }
 
-// Rename ...
+// Rename returns a Series with a new name.
 func (s Series) Rename(name string) Series {
 	s.field.Name = name
 	return s
 }
 
-// Condition ...
-type Condition func(interface{}) bool
-
-// Map ...
+// Map applies the fn function to all values in the s Series and returns a Series
+// with the resulting values.
 func (s Series) Map(fn func(interface{}) interface{}) Series {
 	vals := s.Values()
 	switch vs := vals.(type) {
@@ -844,7 +845,10 @@ func (s Series) Map(fn func(interface{}) interface{}) Series {
 	}
 }
 
-// Where ...
+// Condition ...
+type Condition func(interface{}) bool
+
+// Where returns a Series where values satisfy any of the conditions.
 func (s Series) Where(cs ...Condition) Series {
 	s.Retain()
 	defer s.Release()
@@ -902,7 +906,7 @@ func (s Series) Where(cs ...Condition) Series {
 	}
 }
 
-// Head ...
+// Head returns a Series with n values.
 func (s Series) Head(n int) Series {
 	s.Retain()
 	defer s.Release()
@@ -918,7 +922,9 @@ func (s Series) Head(n int) Series {
 	}
 }
 
-// SortValues ...
+// SortValues returns a Series with sorted values.
+//
+// TODO(poopoothegorilla): add sort options
 func (s Series) SortValues() Series {
 	s.Retain()
 	defer s.Release()
@@ -969,7 +975,7 @@ func (s Series) SortValues() Series {
 	}
 }
 
-// DropNA ...
+// DropNA returns a Series without null values.
 func (s Series) DropNA() Series {
 	s.Retain()
 	defer s.Release()
@@ -1020,7 +1026,7 @@ func (s Series) DropNA() Series {
 	}
 }
 
-// Dot ...
+// Dot returns the Dot product of all values in the Series as a float64 value.
 func (s Series) Dot(ss Series) float64 {
 	s.Retain()
 	defer s.Release()
@@ -1060,7 +1066,9 @@ func (s Series) Dot(ss Series) float64 {
 	}
 }
 
-// Abs ...
+// Abs returns a Series with all absolute values.
+//
+// TODO(poopoothegorilla): need to pass valids into new Series.
 func (s Series) Abs() Series {
 	s.Retain()
 	defer s.Release()
@@ -1090,7 +1098,7 @@ func (s Series) Abs() Series {
 	}
 }
 
-// Min ...
+// Min returns the minimum value of the Series as a float64.
 func (s Series) Min() float64 {
 	s.Retain()
 	defer s.Release()
@@ -1113,7 +1121,7 @@ func (s Series) Min() float64 {
 	}
 }
 
-// Max ...
+// Max returns the maximum value of the Series as a float64.
 func (s Series) Max() float64 {
 	s.Retain()
 	defer s.Release()
@@ -1136,7 +1144,7 @@ func (s Series) Max() float64 {
 	}
 }
 
-// Mean ...
+// Mean retuns the mean of the Series as a float64.
 func (s Series) Mean() float64 {
 	s.Retain()
 	defer s.Release()
@@ -1159,9 +1167,9 @@ func (s Series) Mean() float64 {
 	}
 }
 
-// Median ...
+// Median returns the median value of the Series as a float64.
 //
-// TODO: LOSING TO GOTA NEEDS IMPROVEMENT
+// TODO(poopoothegorilla): inefficient could be improved
 func (s Series) Median() float64 {
 	s.Retain()
 	defer s.Release()
@@ -1178,7 +1186,7 @@ func (s Series) Median() float64 {
 	return (lv + rv) / float64(2)
 }
 
-// Square ...
+// Square returns a Series with all values squared.
 func (s Series) Square() Series {
 	s.Retain()
 	defer s.Release()
@@ -1208,7 +1216,7 @@ func (s Series) Square() Series {
 	}
 }
 
-// Sqrt ...
+// Sqrt returns a Series with the square root of all values.
 func (s Series) Sqrt() Series {
 	s.Retain()
 	defer s.Release()
@@ -1238,7 +1246,7 @@ func (s Series) Sqrt() Series {
 	return FromFloat64(s.pool, f, vals, nil)
 }
 
-// Add ...
+// Add adds two equal length and type Series and returns the resulting Series.
 func (s Series) Add(ss Series) Series {
 	s.Retain()
 	defer s.Release()
@@ -1279,7 +1287,8 @@ func (s Series) Add(ss Series) Series {
 	}
 }
 
-// Subtract ...
+// Subtract subtracts two equal length and type Series and returns the resulting
+// Series.
 func (s Series) Subtract(ss Series) Series {
 	s.Retain()
 	defer s.Release()
@@ -1321,7 +1330,8 @@ func (s Series) Subtract(ss Series) Series {
 	}
 }
 
-// Append ...
+// Append returns a Series with the values from the ss Series appended to the s
+// Series.
 func (s Series) Append(ss Series) Series {
 	s.Retain()
 	defer s.Release()
