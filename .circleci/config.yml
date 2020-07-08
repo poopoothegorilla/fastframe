@@ -24,5 +24,3 @@ jobs:
             mv coverage.html /tmp/artifacts
       - store_artifacts:
           path: /tmp/artifacts
-      - codecov/upload:
-          file: /tmp/artifacts/coverage.html
