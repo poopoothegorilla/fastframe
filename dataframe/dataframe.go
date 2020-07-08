@@ -24,7 +24,8 @@ type DataFrame struct {
 	reader io.Reader
 }
 
-// NewFromRecords ...
+// NewFromRecords creates a DataFrame from Arrow records.
+//
 // TODO(poopoothegorilla): optimizations are needed here
 func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 	if len(records) <= 0 {
@@ -141,7 +142,7 @@ func NewFromRecords(pool memory.Allocator, records []array.Record) DataFrame {
 	}
 }
 
-// NewFromSeries ...
+// NewFromSeries creates a DataFrame from Series.
 func NewFromSeries(pool memory.Allocator, series []series.Series) DataFrame {
 	for _, s := range series {
 		s.Retain()
@@ -153,9 +154,9 @@ func NewFromSeries(pool memory.Allocator, series []series.Series) DataFrame {
 	}
 }
 
-// NewFromCSV ...
+// NewFromCSV creates a DataFrame from a CSV reader.
 //
-// TODO(poopoothegorilla): maybe change the batchSize and type List to Optional
+// TODO(poopoothegorilla): change the batchSize and type List to Optional
 // Option params
 func NewFromCSV(pool memory.Allocator, r *csv.Reader, batchSize int, tList map[string]arrow.DataType) DataFrame {
 	// TODO(poopoothegorilla): add batching
@@ -217,7 +218,7 @@ func NewFromCSV(pool memory.Allocator, r *csv.Reader, batchSize int, tList map[s
 // NOTE: for gonum Matrix interface
 //////////////
 
-// At ...
+// At returns the float64 value at row i and Series j.
 func (df DataFrame) At(i, j int) float64 {
 	df.Retain()
 	defer df.Release()
@@ -225,7 +226,7 @@ func (df DataFrame) At(i, j int) float64 {
 	return df.series[j].At(i, 0)
 }
 
-// T ...
+// T returns a transpose of the DataFrame values as a gonum Matrix.
 func (df DataFrame) T() mat.Matrix {
 	df.Retain()
 	defer df.Release()
@@ -239,7 +240,7 @@ func (df DataFrame) T() mat.Matrix {
 	return NewFromSeries(df.pool, rows)
 }
 
-// Dims ...
+// Dims returns dimensions of the DataFrame as rows and columns.
 func (df DataFrame) Dims() (r, c int) {
 	df.Retain()
 	defer df.Release()
@@ -264,7 +265,7 @@ func (df DataFrame) newSchema() *arrow.Schema {
 	return arrow.NewSchema(fields, nil)
 }
 
-// Schema ...
+// Schema returns the Arrow schema of the DataFrame.
 func (df DataFrame) Schema() *arrow.Schema {
 	if df.schema == nil {
 		df.schema = df.newSchema()
@@ -273,31 +274,31 @@ func (df DataFrame) Schema() *arrow.Schema {
 	return df.schema
 }
 
-// NumRows ...
+// NumRows returns the number of rows as an int64.
 func (df DataFrame) NumRows() int64 {
 	r, _ := df.Dims()
 	return int64(r)
 }
 
-// NumCols ...
+// NumCols returns the number of columns as an int64.
 func (df DataFrame) NumCols() int64 {
 	_, c := df.Dims()
 	return int64(c)
 }
 
-// Column ...
+// Column returns the Series at position i as an Arrow column.
 func (df DataFrame) Column(i int) *array.Column {
 	return df.series[i].Column()
 }
 
-// Release ...
+// Release releases a referece count from all Series.
 func (df DataFrame) Release() {
 	for _, c := range df.series {
 		c.Release()
 	}
 }
 
-// Retain ...
+// Retain adds a reference count to each Series.
 func (df DataFrame) Retain() {
 	for _, c := range df.series {
 		c.Retain()
@@ -331,12 +332,13 @@ func (df DataFrame) Cast(cList map[string]arrow.DataType) DataFrame {
 	return NewFromSeries(df.pool, ss)
 }
 
-// Series ...
+// Series returns the Series in the i position.
 func (df DataFrame) Series(i int) series.Series {
 	return df.series[i]
 }
 
-// HasSeries ...
+// HasSeries returns a truthy value if the DataFrame has a Series with a given
+// name.
 func (df DataFrame) HasSeries(name string) bool {
 	df.Retain()
 	defer df.Release()
@@ -350,7 +352,8 @@ func (df DataFrame) HasSeries(name string) bool {
 	return false
 }
 
-// SeriesByName ...
+// SeriesByName returns the Series with the given name. If no Series exists with
+// that name a panic is triggered.
 func (df DataFrame) SeriesByName(name string) series.Series {
 	df.Retain()
 	defer df.Release()
@@ -365,7 +368,7 @@ func (df DataFrame) SeriesByName(name string) series.Series {
 	return series.Series{}
 }
 
-// ApplyToSeries ...
+// ApplyToSeries applies a function to each Series in the DataFrame.
 func (df DataFrame) ApplyToSeries(fn func(series.Series) series.Series) DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -378,7 +381,7 @@ func (df DataFrame) ApplyToSeries(fn func(series.Series) series.Series) DataFram
 	return NewFromSeries(df.pool, ss)
 }
 
-// ApplyToRecords ...
+// ApplyToRecords applies a function to each Arrow record in the DataFrame.
 func (df DataFrame) ApplyToRecords(fn func(array.Record) array.Record) DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -398,7 +401,7 @@ func (df DataFrame) ApplyToRecords(fn func(array.Record) array.Record) DataFrame
 	return NewFromRecords(df.pool, records)
 }
 
-// Head ...
+// Head returns a DataFrame with only n records.
 func (df DataFrame) Head(n int) DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -411,7 +414,7 @@ func (df DataFrame) Head(n int) DataFrame {
 	return NewFromSeries(df.pool, ss)
 }
 
-// Record ...
+// Record returns the Arrow record in the i position.
 func (df DataFrame) Record(i int) array.Record {
 	df.Retain()
 
@@ -427,7 +430,7 @@ func (df DataFrame) Record(i int) array.Record {
 	return array.NewRecord(df.Schema(), cols, -1)
 }
 
-// EmptyRecord ...
+// EmptyRecord returns a empty Arrow record with the DataFrame's schema.
 func (df DataFrame) EmptyRecord(n int) array.Record {
 	df.Retain()
 
@@ -442,8 +445,7 @@ func (df DataFrame) EmptyRecord(n int) array.Record {
 	return array.NewRecord(df.Schema(), cols, -1)
 }
 
-// MergeRecords ...
-// TODO(poopoothegorilla) finish
+// MergeRecords merges multiple Arrow records into a new Arrow record.
 func MergeRecords(records ...array.Record) array.Record {
 	var numCols int64
 	for _, record := range records {
@@ -464,25 +466,9 @@ func MergeRecords(records ...array.Record) array.Record {
 	return array.NewRecord(schema, cols, -1)
 }
 
-// Row ...
-// NOTE: THIS MIGHT NOT BE A GOODE API OR IDEA
-// func (df DataFrame) Row(i int) Row {
-// 	df.Retain()
+// RowToSeries creates a float64 Series from a values in row i from the
+// DataFrame.
 //
-// 	_, cs := df.Dims()
-// 	vals := make([]interface{}, cs)
-// 	valid := make([]bool, cs)
-// 	for j, s := range df.series {
-// 		vals[j] = s.Value(i)
-// 		valid[j] = !s.IsNull(i)
-// 	}
-//
-// 	df.Release()
-// 	return Row{Vals: vals, Valid: valid}
-// }
-
-// RowToSeries ...
-// TODO(poopoothegorilla): should use the Row type.
 // NOTE: THIS MIGHT NOT BE A GOODE API OR IDEA
 func (df DataFrame) RowToSeries(i int) series.Series {
 	df.Retain()
@@ -498,7 +484,7 @@ func (df DataFrame) RowToSeries(i int) series.Series {
 	return series.FromFloat64(df.pool, f, result, nil)
 }
 
-// Abs ...
+// Abs calculates the absolute value on each value in the DataFrame.
 func (df DataFrame) Abs() DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -511,7 +497,7 @@ func (df DataFrame) Abs() DataFrame {
 	return NewFromSeries(df.pool, newSeries)
 }
 
-// Add ...
+// Add adds two equal length DataFrames and returns the resulting DataFrame.
 func (df DataFrame) Add(df2 DataFrame) DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -538,9 +524,10 @@ func (df DataFrame) Add(df2 DataFrame) DataFrame {
 	return NewFromSeries(df.pool, ss)
 }
 
-// AppendRecords ...
+// AppendRecords appends records to the DataFrame.
+//
 // NOTE: CURRENTLY INCLUSIVE ONLY
-// TODO: SOME MEMORY ISSUES WITH ARROW
+// TODO(poopoothegorilla): SOME MEMORY ISSUES WITH ARROW
 func (df DataFrame) AppendRecords(records []array.Record) DataFrame {
 	for _, record := range records {
 		record.Retain()
@@ -565,7 +552,7 @@ func (df DataFrame) AppendRecords(records []array.Record) DataFrame {
 	return NewFromRecords(df.pool, allRecords)
 }
 
-// AppendSeries ...
+// AppendSeries appends Series to the DataFrame.
 func (df DataFrame) AppendSeries(ss []series.Series) DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -590,7 +577,10 @@ func (df DataFrame) AppendSeries(ss []series.Series) DataFrame {
 	return NewFromSeries(df.pool, newseries)
 }
 
-// SelectColumnsByNames ...
+// SelectColumnsByNames returns a DataFrame with Series which match the given
+// names.
+//
+// TODO(poopoothegorilla): change columns to series
 func (df DataFrame) SelectColumnsByNames(names []string) DataFrame {
 	df.Retain()
 	defer df.Release()
@@ -607,7 +597,10 @@ func (df DataFrame) SelectColumnsByNames(names []string) DataFrame {
 	return NewFromSeries(df.pool, ss)
 }
 
-// DropColumnsByIndices ...
+// DropColumnsByIndices returns a DataFrame without Series in each indices
+// position.
+//
+// TODO(poopoothegorilla): change columns to series
 func (df DataFrame) DropColumnsByIndices(indices []int) DataFrame {
 	df.Retain()
 	defer df.Release()
